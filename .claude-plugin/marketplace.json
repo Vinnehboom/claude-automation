@@ -1,0 +1,21 @@
+{
+  "name": "vinnie-automation",
+  "owner": {
+    "name": "Vinnehboom"
+  },
+  "description": "Shared Claude Code automation for projects that run a Notion kanban board against GitHub pull requests.",
+  "plugins": [
+    {
+      "name": "kanban-automation",
+      "source": "./plugins/kanban-automation",
+      "displayName": "Kanban automation",
+      "description": "Scheduled kanban board cycles, the ticket pipeline that drives one card to a reviewed pull request, and orchestrator handoff.",
+      "author": {
+        "name": "Vinnehboom"
+      },
+      "repository": "https://github.com/Vinnehboom/claude-automation",
+      "category": "productivity",
+      "tags": ["kanban", "notion", "github", "orchestration"]
+    }
+  ]
+}
