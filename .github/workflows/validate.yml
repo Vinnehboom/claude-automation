@@ -1,0 +1,99 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check manifests and skill structure
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          let failed = false;
+          const fail = (m) => { console.error('FAIL ' + m); failed = true; };
+          const ok = (m) => console.log('ok   ' + m);
+
+          const readJson = (p) => {
+            try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+            catch (e) { fail(`${p}: ${e.message}`); return null; }
+          };
+
+          const market = readJson('.claude-plugin/marketplace.json');
+          if (market) {
+            for (const key of ['name', 'owner', 'plugins']) {
+              if (!(key in market)) fail(`marketplace.json: missing "${key}"`);
+            }
+            if (!Array.isArray(market.plugins) || market.plugins.length === 0) {
+              fail('marketplace.json: "plugins" must be a non-empty array');
+            } else {
+              ok(`marketplace "${market.name}" lists ${market.plugins.length} plugin(s)`);
+              for (const entry of market.plugins) {
+                if (!entry.name || !entry.source) {
+                  fail(`marketplace.json: plugin entry needs "name" and "source"`);
+                  continue;
+                }
+                const root = entry.source.startsWith('./') ? entry.source.slice(2) : null;
+                if (!root) continue;
+                if (!fs.existsSync(root)) {
+                  fail(`${entry.name}: source "${entry.source}" does not exist`);
+                  continue;
+                }
+                const manifest = path.join(root, '.claude-plugin', 'plugin.json');
+                if (!fs.existsSync(manifest)) {
+                  fail(`${entry.name}: no .claude-plugin/plugin.json at ${root}`);
+                  continue;
+                }
+                const plugin = readJson(manifest);
+                if (plugin && !plugin.name) fail(`${manifest}: missing "name"`);
+                if (plugin) ok(`plugin manifest "${plugin.name}"`);
+
+                const skillsDir = path.join(root, 'skills');
+                if (!fs.existsSync(skillsDir)) continue;
+                for (const skill of fs.readdirSync(skillsDir)) {
+                  const p = path.join(skillsDir, skill);
+                  if (!fs.statSync(p).isDirectory()) continue;
+                  const skillFile = path.join(p, 'SKILL.md');
+                  if (!fs.existsSync(skillFile)) { fail(`${skill}: no SKILL.md`); continue; }
+                  const body = fs.readFileSync(skillFile, 'utf8');
+                  if (!body.startsWith('---\n')) { fail(`${skill}: no YAML frontmatter`); continue; }
+                  const end = body.indexOf('\n---', 4);
+                  if (end === -1) { fail(`${skill}: unterminated frontmatter`); continue; }
+                  const front = body.slice(4, end);
+                  if (!/^name:\s*\S/m.test(front)) fail(`${skill}: frontmatter has no "name"`);
+                  if (!/^description:\s*\S/m.test(front)) fail(`${skill}: frontmatter has no "description"`);
+                  ok(`skill "${skill}"`);
+                }
+              }
+            }
+          }
+
+          // A merge that leaves conflict markers in a skill file would ship
+          // broken instructions to every project, so check for them here.
+          const walk = (dir) => {
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+              const p = path.join(dir, e.name);
+              if (e.isDirectory()) { if (e.name !== '.git') walk(p); continue; }
+              if (!/\.(md|json|html)$/.test(e.name)) continue;
+              const text = fs.readFileSync(p, 'utf8');
+              if (/^(<{7}|={7}|>{7})/m.test(text)) fail(`${p}: unresolved merge conflict markers`);
+            }
+          };
+          walk('plugins');
+
+          if (failed) process.exit(1);
+          console.log('\nAll checks passed.');
+          NODE
+
+      - name: Official plugin validator
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate .
+          claude plugin validate plugins/kanban-automation
