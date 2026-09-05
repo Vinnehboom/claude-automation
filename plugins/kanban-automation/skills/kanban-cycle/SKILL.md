@@ -96,7 +96,10 @@ own skill files; those files changed address, so the grant follows them.
 **A pull request here auto-merges when both conditions hold:**
 
 - Every changed path sits under `plugins/*/skills/**`.
-- The `validate` check is green.
+- A check named `validate` ran on the pull request's head commit and
+  passed. **No check run is not a pass.** If the repository reports no
+  checks at all, that condition fails and the pull request waits for
+  review. Never read an empty check list as "nothing is red".
 
 **Everything else here waits for his review**, whatever the diff looks
 like. That means the plugin manifest, the marketplace manifest, the
