@@ -87,10 +87,36 @@ checkout, so such a change needs the extra steps that `/handoff` step 1
 lists. A direct push to `main` gets blocked by the permission classifier
 in both repositories.
 
-Until Vinnie extends `maintenance_automerge_paths` to cover it, a pull
-request on the automation repository waits for his review. Do not
-auto-merge one. The whitelist he gave on 2026-09-03 names paths in the
-project repo.
+### Auto-merge in the automation repository
+
+Vinnie extended the auto-merge grant to this repository on 2026-09-05,
+after being asked. His 2026-09-03 instruction covered the orchestrator's
+own skill files; those files changed address, so the grant follows them.
+
+**A pull request here auto-merges when both conditions hold:**
+
+- Every changed path sits under `plugins/*/skills/**`.
+- The `validate` check is green.
+
+**Everything else here waits for his review**, whatever the diff looks
+like. That means the plugin manifest, the marketplace manifest, the
+README, and the workflow files. A skill file governs how one session
+behaves and a broken one shows up in the next cycle. A broken manifest
+stops every project's orchestrator from loading any skill at all, and
+that failure is silent — so it keeps a human in front of it.
+
+This rule lives in this file rather than in `maintenance_automerge_paths`
+because it is one shared repository, not a per-project path list. Every
+project's cycle reads the same rule from the same skill file. Do not copy
+it into a project config.
+
+**One consequence to hold on to:** a skill change here reaches every
+project, not one. The blast radius is wider than the same change in a
+project repo, and no human sees it before it lands. So the bar for
+"this is a lesson worth writing down" is the bar for changing every
+project's automation at once. When a change is really about one project,
+it is not a lesson — it belongs in that project's `.claude/kanban-cycle.json`
+or its `CLAUDE.md`.
 
 ## 1. Check for in-flight work — from real state, not memory
 
