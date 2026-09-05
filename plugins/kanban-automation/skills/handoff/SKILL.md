@@ -46,7 +46,8 @@ over:
   from live sources (Notion board, open PRs, `ListAgents`) on every run, and
   its step 1 explicitly says conversation memory is NOT a reliable record.
 - **Accumulated lessons and standing instructions** — already written into
-  the skill files in `.claude/skills/`, which the successor reads fresh.
+  the skill files of the `kanban-automation` plugin, which the successor
+  loads fresh from the marketplace.
 - **Environment caveats** (stale local `HEAD`, the classifier blocking
   `git rebase` inside dispatched agents, agents vanishing without trace) —
   also already in those skill files.
@@ -61,10 +62,31 @@ file instead — put it there and reference it.
 
 ### 1. Fold new lessons into the skill files first
 
-Anything this generation learned that should outlive it goes into the
-relevant `.claude/skills/**/SKILL.md` (or its `references/`) now, as a
-normal commit. This is the durable channel; the handoff note is not. A
-lesson left only in the note will be lost at the *next* handoff.
+Anything this generation learned that must outlive it goes into the skill
+files now. This is the durable channel. The handoff note is not. A lesson
+that stays only in the note is lost at the *next* handoff.
+
+**The skill files live in a different repository from the project.** They
+are the `kanban-automation` plugin in `Vinnehboom/claude-automation`. This
+session works in the project checkout, so a lesson does not reach them by
+a normal commit. Do this instead:
+
+1. Attach the automation repository: `add_repo` with owner `Vinnehboom`,
+   repo `claude-automation`, and `access: "push"`.
+2. If `/home/user/claude-automation` does not exist yet, clone it once.
+   Give the clone a generous timeout.
+3. Edit the skill under
+   `plugins/kanban-automation/skills/<skill>/SKILL.md` or its
+   `references/`.
+4. Set the git identity in that clone. A fresh clone does not inherit it.
+5. Commit on a branch and open a pull request against `main` of the
+   automation repository. A direct push to `main` gets blocked by the
+   permission classifier, in that repository as much as in the project.
+
+The successor loads the plugin from the marketplace, so a lesson reaches
+it only after that pull request merges. If the merge waits on Vinnie,
+name the open pull request in the handoff note under pending automation
+work.
 
 ### 2. Write the handoff note
 
@@ -98,14 +120,18 @@ session-specific — find it with `ToolSearch` rather than hardcoding it):
   to name an environment by hand.
 - `source_url` and `source_revision` — **required, and the easiest thing to
   get wrong.** A new session clones the repo's *default* branch unless told
-  otherwise. If the skill files live on a working branch rather than the
-  default branch, a successor spawned without these comes up with no
-  `/handoff` skill and a stale `/kanban-cycle` — an orchestrator missing the
-  definition of its own job, which cannot even hand off again. Set
-  `source_url` to the config's `repo` as a clone URL and `source_revision`
-  to its `orchestrator_branch`. Before spawning, verify that branch actually
-  carries the current skills (`git ls-tree -r --name-only <rev> -- .claude`)
-  rather than assuming it.
+  otherwise. Set `source_url` to the config's `repo` as a clone URL and
+  `source_revision` to its `orchestrator_branch`.
+
+  The skills themselves now come from the `kanban-automation` plugin, not
+  from the cloned branch. The branch still decides whether the successor
+  gets the plugin at all, because `extraKnownMarketplaces` and
+  `enabledPlugins` live in the project's `.claude/settings.json`. Before
+  you spawn, make sure that the revision carries both keys:
+  `git show <rev>:.claude/settings.json`. A successor spawned from a
+  revision without them comes up with no `/handoff` skill and no cycle
+  skill — an orchestrator that misses the definition of its own job, and
+  that cannot hand off again.
 - `model` — pin `"claude-sonnet-5"` explicitly. Triage and dispatch are not
   adversarial-critique work, and the expensive judgement in this system is
   already isolated in `/ticket-pipeline`'s Reviewer phase. Do not leave it
@@ -149,10 +175,15 @@ Do these in order, then stop and stay idle until a Routine fires:
    that failed. Do not restate the board's state — the next scheduled
    cycle covers that.
 
-Standing role from here: you run /kanban-cycle when a Routine fires, and
-answer the user directly when they message you. Read
-.claude/skills/kanban-cycle/SKILL.md when the first cycle fires — do not
-read it now, it costs context you do not need yet.
+Standing role from here: you run the kanban cycle when a Routine fires,
+and answer the user directly when they message you. The cycle skill comes
+from the kanban-automation plugin. Load it when the first cycle fires — do
+not load it now, it costs context you do not need yet.
+
+Before you report back, make sure that the plugin is loaded: run
+/plugin list, or look for the kanban-automation skills. If the plugin is
+absent, say so in your report and stop. An orchestrator without its own
+skills cannot run a cycle and cannot hand off again.
 ```
 
 The successor does the re-pointing, not the predecessor, for two reasons:
@@ -193,11 +224,18 @@ yourself — the successor owns that, and doing it early strands the Routines.
   subagent of the predecessor does not survive into the successor.
 - **The note is overwritten, not appended.** It describes the present, not
   the history. Durable lessons belong in the skill files (step 1).
-- **Never spawn a successor from a revision that lacks the current skill
-  files.** Check before spawning, not after. A successor without
-  `/handoff` and the current `/kanban-cycle` looks healthy — it starts, it
-  answers, it has its connectors — but it silently runs the old automation
-  and can never cycle itself again, so the failure only surfaces
-  generations later. Getting the skills onto the repo's default branch
-  removes this whole class of bug; pinning `source_revision` only works
-  around it.
+- **Never spawn a successor that cannot load the plugin.** Check before
+  you spawn, not after. A successor without the handoff and cycle skills
+  looks healthy. It starts, it answers, it has its connectors. But it runs
+  no automation and it can never cycle itself again, so the failure
+  surfaces generations later. Two conditions must hold, and each fails
+  silently on its own:
+  - The spawn revision carries `extraKnownMarketplaces` and
+    `enabledPlugins` in `.claude/settings.json`.
+  - The environment's setup script installs the plugin. A plugin from an
+    external source does not load from `enabledPlugins` alone, and
+    `/plugin` does not exist in a cloud session.
+
+  The successor's own report says whether the plugin loaded. If the report
+  says it did not, treat the handoff as failed: keep the Routines on the
+  predecessor and fix the cause first.
