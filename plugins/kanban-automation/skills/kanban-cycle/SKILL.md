@@ -73,6 +73,8 @@ after.
 
 ## 1. Check for in-flight work — from real state, not memory
 
+**First, exclude any ticket in `externally_owned_ticket_ids` (in `.claude/kanban-cycle.json`) from every step below — this whole skill file, not just this step.** An empty or absent list is the normal case; a non-empty one means Vinnie has given specific tickets to another session to drive end to end, outside this orchestrator's flow entirely. Skip an excluded ticket even if it's High priority and looks ready, don't triage/rebase/comment/dispatch onto its PR once one opens (two sessions pushing one branch fight each other), and don't count its PR toward `max_open_prs`/`max_stacked_prs`. List it in the rundown (step 7) as "owned by another session" if there's anything worth noting, but take no action. Remove an ID from this list only on Vinnie's word that the exclusion is over — never infer it from the other session going quiet or its PR merging.
+
 Ticket work now runs in its own dispatched worktree-isolated agent (see
 "Dispatch mechanics"), not inline in this session, so this session's own
 conversation history is NOT a reliable record of what's already
@@ -113,11 +115,15 @@ ticket-linked PRs only (see step 4) — that's `stacked_count`, capped at
 automation-maintenance change to `.claude/skills/`, `.claude/settings.json`,
 or similar repo/automation config, opened by this orchestrator itself, not
 by `/ticket-pipeline` for a tracked ticket — is exempt from `max_open_prs`
-and `max_stacked_prs`. These PRs still need Vinnie's review/merge like any
-other, and still get listed in the rundown, but they don't consume the
-ticket-pipeline's PR budget: that budget exists to bound ticket-dispatch
-concurrency (review load, the shared-Postgres-test-DB risk under "Dispatch
-mechanics"), and a markdown/config-only PR carries none of that risk.
+and `max_stacked_prs`. They still get listed in the rundown, but they don't
+consume the ticket-pipeline's PR budget: that budget exists to bound
+ticket-dispatch concurrency (review load, the shared-Postgres-test-DB risk
+under "Dispatch mechanics"), and a markdown/config-only PR carries none of
+that risk. **Whether a maintenance PR still needs Vinnie's review before
+merge depends on its files** — see step 3's whitelisted-auto-merge case: a
+maintenance PR whose entire diff sits inside `maintenance_automerge_paths`
+merges on green CI alone; one that touches anything outside that list
+still needs his review/merge like a ticket-linked PR.
 
 **First review given** on a PR means the user (the repo owner) has
 submitted at least one review (any state — comment, approve, or changes
@@ -137,6 +143,8 @@ job is "did anything change" does not need to re-read three PR
 descriptions to answer it.
 
 ## 3. Triage existing PRs before starting anything new
+
+**Before anything else here: does this PR's body link a ticket in `externally_owned_ticket_ids`?** If so, this PR isn't this orchestrator's to triage — see step 1's exclusion note. List it in the rundown as "owned by another session" and move on; don't rebase it, don't comment on it, don't dispatch onto it even for a CI fix.
 
 Open PRs always come before new work. First, `ListAgents` to see which
 dispatched subagents from a previous cycle are still active — match them
@@ -258,10 +266,36 @@ active agent:
 Each dispatched PR gets its own agent, so up to `max_open_prs` of these
 can be running in parallel — that cap is exactly what keeps this bounded.
 
-For open PRs that do NOT link a Notion ticket (opened by hand, or a
-maintenance PR opened by this orchestrator itself): leave them alone —
-don't push to someone else's branch — but list them in the rundown. They
-do not count against `max_open_prs` or `max_stacked_prs` (see step 4).
+For open PRs that do NOT link a Notion ticket, first check whether this is
+a maintenance PR *this orchestrator itself opened* (never for a PR opened
+by hand — see below) and whether it qualifies for whitelisted auto-merge:
+
+- **Maintenance PR, entire diff inside `maintenance_automerge_paths`, CI
+  green** → merge it automatically, no lgtm needed. Standing instruction,
+  2026-09-03, given explicitly by Vinnie after being asked which PRs may
+  skip his review — deliberately narrow to the orchestrator's own
+  skill/config files (`.claude/skills/**`, `.claude/settings.json`,
+  `.claude/kanban-cycle.json`, `docs/orchestrator-handoff.md` as of this
+  writing; the live list is `maintenance_automerge_paths` in
+  `.claude/kanban-cycle.json`, don't hardcode it here). Check eligibility
+  with `pull_request_read` (`get_files`) and match every changed path
+  against the whitelist — **one file outside it disqualifies the whole
+  PR**, fall through to "leave it alone" below, don't merge the parts that
+  do match. This never applies to a PR with a linked Notion ticket (that
+  always goes through the lgtm-gated case above, whatever files it
+  touches) and never to a PR opened by hand (Vinnie's own). Mark ready for
+  review if still draft, merge with `merge_method: "rebase"` (no merge
+  commit, same as every other merge in this skill), then run the same
+  rebase-cascade-onto-new-tip step the lgtm-merge case does for every
+  other open PR — a maintenance merge moves the default branch forward
+  exactly like a ticket merge does. There's no Notion card to flip for a
+  maintenance PR. Note the merge in the rundown (step 7) like any other
+  state change.
+- **Anything else without a linked ticket** (a maintenance PR outside the
+  whitelist, or a PR opened by hand) → leave it alone, don't push to
+  someone else's branch, but list it in the rundown.
+
+Neither case counts against `max_open_prs` or `max_stacked_prs` (see step 4).
 
 ## 4. Compute room for new work
 
@@ -288,9 +322,10 @@ many are open at once.
 Fetch the Notion board (`notion_board_url`). Candidates are cards with
 status "Not started" whose dependencies (`Depends On`) are satisfied —
 either the dependency card is Done, or its PR is open and eligible to
-stack onto per step 4. Rank by priority (as `/ticket-pipeline` does when
-told "do the next one"). Walk the ranked list and take the first candidate
-that clears step 4's room check.
+stack onto per step 4 — **excluding any Task ID in `externally_owned_ticket_ids`
+(step 1) outright, whatever its priority or ready-ness.** Rank by priority
+(as `/ticket-pipeline` does when told "do the next one"). Walk the ranked
+list and take the first candidate that clears step 4's room check.
 
 If no candidate clears it (board empty of ready work, or every ready
 ticket is blocked by the PR/stacking caps), that's a valid outcome — say so
@@ -505,7 +540,7 @@ stray commit (`git format-patch -1 HEAD`), `git fetch origin <branch>`,
 by hand is usually faster than `git am`, which conflicts when the stale
 base differs much from the real one.
 
-**Six more environment facts, learned 2026-08-29 through 2026-08-31, worth knowing before they cost a cycle:**
+**Seven more environment facts, learned 2026-08-29 through 2026-09-02, worth knowing before they cost a cycle:**
 - **`circleci.com` is unreachable from this environment** — the network egress proxy blocks it outright (confirmed via direct `curl`, both the web UI and the v1.1 API return a 403 at the proxy). A CI-red dispatch cannot read CircleCI job logs at all. Diagnose CI failures by reading `.circleci/config.yml` and the diff statically, reproducing what's reproducible locally, and reasoning from the commit status alone — don't waste a dispatch's budget trying to fetch the log.
 - **A dispatched agent can be killed by an org-wide rate-limit/spend-limit error**, not just this session's own cost ceiling — it arrives as a `failed` (not `completed`) task-notification carrying a raw 429 error instead of a clean hand-back. Don't take that at face value: check the branch/PR/Notion state directly (git log, `git diff` against origin, the PR's current commits) before assuming work was lost — the underlying commits/pushes had often already succeeded, and only the final clean summary was cut off.
 - **A container restart can kill every live background dispatch at once**, silently — a system notice names which tasks stopped, but any that don't get named may just vanish. Re-check `git worktree list` and real PR/Notion state after any such notice rather than trusting what a cycle thought was still running.
@@ -513,6 +548,7 @@ base differs much from the real one.
 - **A recovered dispatch's new worktree directory can be named after a DIFFERENT agent's ID, not its own** — observed 2026-08-30: dispatch A's original worktree vanished mid-run (the known container-restart failure mode); when the harness gave it a fresh worktree, that worktree's directory was named `agent-<dispatch B's own ID>`, where dispatch B was a wholly separate, concurrently-running ticket dispatch. `ListAgents` kept reporting dispatch B as "running" for hours afterward with no worktree of its own in `git worktree list` — its slot had apparently been reused for A's recovery. Don't trust an agent ID string in a worktree directory name as proof that agent is still alive or that the worktree is really its own; if a dispatch's `ListAgents` runtime looks abnormally long, cross-check `git worktree list` (does a worktree actually exist under that exact agent's own directory) and `git ls-remote --heads origin` (does its ticket's branch exist at all) before trusting the "running" status — and before handing off, since a genuinely orphaned dispatch does not survive into the successor and needs to be flagged in the handoff note, not assumed fine.
 - **A dispatch's worktree can vanish entirely with no replacement at all** — a step further than the case above. Observed twice in a row on ticket H-6 (2026-08-31): a dispatch's `.claude/worktrees/agent-<its own ID>` directory disappeared mid-run, `git worktree list` stopped listing it (not just the directory — the registration itself was gone), and the dispatch's shell cwd fell back to the orchestrator's own main checkout. Both times the dispatch correctly refused to run any git operation there (right call — don't touch the shared checkout) and handed back cleanly with nothing lost (both were still read-only at that point). If this happens, don't resume the same dispatch — spawn a genuinely fresh one; a `SendMessage` resume risks putting the same agent right back in the same broken worktree state. Point the fresh dispatch at whatever was already durably recorded (a Notion card's `## Plan`, a pushed commit) so it doesn't redo completed phases.
 - **The classifier blocks rewriting an already-published commit's authorship, even from this orchestrator's own session — distinct from the dispatched-agent rebase block above.** Confirmed 2026-08-31: `git commit --amend --author=...` on a commit a dispatched subagent had already pushed (fixing it from `Claude <noreply@anthropic.com>` to the repo's real git identity) was denied. So was the alternative of `git reset --soft HEAD~1` + a plain `git commit` under the correct ambient `git config user.name`/`user.email` — no `--author` flag at all, just the default identity — reusing the same message. Both attempts were denied, specifically for a commit that already existed under a different identity; the identical `commit --amend --author=` succeeded without issue on a commit this session had made itself in the same turn it was amending. **Fix at the source, not after the fact:** every dispatch prompt must tell the subagent to run `git config user.name "Vinnehboom"` / `git config user.email "<repo email>"` (see `ticket-pipeline/references/developer.md`'s "Commit identity" section) as one of its first steps, before its first commit — don't rely on catching a wrong-author commit later, because you likely can't fix it. If one does slip through already-published, the practical options are: leave it (author metadata isn't user-facing content, just a git technicality) or ask the user to amend it themselves, since they don't hit this classifier boundary.
+- **A `cd` into a vanished worktree directory can fail silently and leave the shell wherever it already was** — confirmed 2026-09-02, at least three separate times in one generation (a C-24 developer retry, a C-28 developer, a C-26 planner). This is routine in this environment, not a rare edge case: a `cd` to a path that no longer exists doesn't always raise a loud, unambiguous error the rest of that same Bash call reacts to, so a later command in the same call can silently execute in the orchestrator's own live checkout instead. The mandatory first-step check (`pwd` / `git rev-parse --show-toplevel` before any git command) is not a one-time gate at dispatch start — it must hold after every subsequent `cd` too. The dispatches that caught this correctly never trusted a `cd`'s exit code alone; they verified with `pwd` immediately after.
 
 ## 7. End-of-cycle rundown (always)
 
@@ -567,6 +603,10 @@ this one end-of-cycle rundown and push, not announced separately.
 
 ## Guardrails
 
+- Never dispatch, triage, rebase, comment on, or otherwise act on a ticket
+  or PR whose Task ID is in `externally_owned_ticket_ids` (`.claude/kanban-cycle.json`) —
+  Vinnie gave it to another session to drive, and this exclusion is his
+  call to lift, not something to infer from the other session going quiet.
 - PR triage always comes before starting new work — never skip straight to
   step 5 because step 3 found nothing urgent-looking; check first.
 - Never exceed `max_open_prs` or `max_stacked_prs` (currently 2 and 2 —
@@ -586,8 +626,12 @@ this one end-of-cycle rundown and push, not announced separately.
   under "Dispatch mechanics" before ever running specs directly in this
   session while a dispatch is active.
 - No merge commits, ever — rebase only, same as `/ticket-pipeline`.
-- Don't touch a PR that doesn't link a Notion ticket card — it isn't this
-  automation's to drive.
+- Don't touch a PR that doesn't link a Notion ticket card, with exactly one
+  exception: merging it per step 3's whitelisted-auto-merge case, when its
+  entire diff sits inside `maintenance_automerge_paths` and CI is green.
+  Never widen that whitelist, and never apply the exception to a
+  ticket-linked PR or an outside-the-whitelist maintenance PR — those still
+  need Vinnie's review.
 - Never trust local `HEAD` at face value — verify it against
   `origin/<branch>` first (see "Trusting local git state" under
   "Dispatch mechanics").
