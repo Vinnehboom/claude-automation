@@ -129,15 +129,11 @@ session-specific — find it with `ToolSearch` rather than hardcoding it):
   otherwise. Set `source_url` to the config's `repo` as a clone URL and
   `source_revision` to its `orchestrator_branch`.
 
-  The skills themselves now come from the `kanban-automation` plugin, not
-  from the cloned branch. The branch still decides whether the successor
-  gets the plugin at all, because `extraKnownMarketplaces` and
-  `enabledPlugins` live in the project's `.claude/settings.json`. Before
-  you spawn, make sure that the revision carries both keys:
-  `git show <rev>:.claude/settings.json`. A successor spawned from a
-  revision without them comes up with no `/handoff` skill and no cycle
-  skill — an orchestrator that misses the definition of its own job, and
-  that cannot hand off again.
+  `create_session` takes ONE source, so the successor gets the project
+  repository and nothing else. The skills come from the
+  `kanban-automation` plugin, and the plugin arrives by an install, not
+  by a file in the clone. Read the plugin precondition in the guardrails
+  below before you spawn.
 - `model` — pin `"claude-sonnet-5"` explicitly. Triage and dispatch are not
   adversarial-critique work, and the expensive judgement in this system is
   already isolated in `/ticket-pipeline`'s Reviewer phase. Do not leave it
@@ -239,18 +235,40 @@ yourself — the successor owns that, and doing it early strands the Routines.
   `dashboard_artifact_url`; publishing a fresh board for a new
   generation breaks Vinnie's bookmark and splits the cycle log, which
   defeats the reason the board exists.
-- **Never spawn a successor that cannot load the plugin.** Check before
-  you spawn, not after. A successor without the handoff and cycle skills
-  looks healthy. It starts, it answers, it has its connectors. But it runs
-  no automation and it can never cycle itself again, so the failure
-  surfaces generations later. Two conditions must hold, and each fails
-  silently on its own:
-  - The spawn revision carries `extraKnownMarketplaces` and
-    `enabledPlugins` in `.claude/settings.json`.
-  - The environment's setup script installs the plugin. A plugin from an
-    external source does not load from `enabledPlugins` alone, and
-    `/plugin` does not exist in a cloud session.
+- **Never spawn a successor that cannot install the plugin.** Check
+  before you spawn, not after. A successor without the handoff and cycle
+  skills looks healthy. It starts, it answers, it has its connectors. But
+  it runs no automation and it can never cycle itself again, so the
+  failure surfaces generations later.
 
-  The successor's own report says whether the plugin loaded. If the report
-  says it did not, treat the handoff as failed: keep the Routines on the
-  predecessor and fix the cause first.
+  **The precondition is the install, not any file in the project.**
+  Measured 2026-09-06: a project `.claude/settings.json` that carries
+  `extraKnownMarketplaces` and `enabledPlugins` installs nothing by
+  itself. In a clean config directory, `claude plugin list` answers "No
+  plugins installed". Those two keys are what a successful install
+  WRITES. They are a receipt, not a request. An earlier version of this
+  guardrail told you to check the spawn revision for them. That check
+  reads the wrong thing, and it passes a successor that cannot work.
+
+  **What the install needs is the marketplace clone.** The environment's
+  setup script runs `claude plugin marketplace add`, then
+  `claude plugin install`. The add step clones the automation repository
+  through the git proxy of the session, and that proxy allows only the
+  repositories attached to the session. Public does not mean reachable.
+  Measured the same day, in one environment: the session with both
+  repositories attached installed the plugin. The orchestrator session
+  with only the project attached never did. Its setup script failed with
+  `Plugin "kanban-automation" not found in marketplace "vinnie-automation"`.
+  That message names the plugin, so it reads like a stale marketplace. It
+  is an empty one.
+
+  **So make sure that the automation repository is a source on the
+  ENVIRONMENT, not on one session.** `create_session` passes one
+  `source_url`, and `add_repo` runs in a turn. A turn is after the setup
+  script has already run and failed.
+
+  The successor's own report says whether the plugin loaded. If the
+  report says it did not, treat the handoff as failed: keep the Routines
+  on the predecessor and fix the cause first. A successor can repair
+  itself with `add_repo` and a manual install. Every generation then
+  needs a person, which is what this skill exists to avoid.

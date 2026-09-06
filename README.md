@@ -51,35 +51,49 @@ phase writes ordinary prose. Nothing else breaks.
 
 ## Install the plugin in a project
 
-1. Add the marketplace and the plugin to `.claude/settings.json` of the
-   project:
+The install is what puts the plugin on disk. A declaration in
+`.claude/settings.json` does not. Measured 2026-09-06: a project settings
+file that carries `extraKnownMarketplaces` and `enabledPlugins` installs
+nothing, and `claude plugin list` answers "No plugins installed". A
+successful install writes those two keys itself. They are a receipt, not
+a request.
 
-```json
-{
-  "extraKnownMarketplaces": {
-    "vinnie-automation": {
-      "source": { "source": "github", "repo": "Vinnehboom/claude-automation" }
-    }
-  },
-  "enabledPlugins": { "kanban-automation@vinnie-automation": true }
-}
+### In a terminal
+
+```sh
+claude plugin marketplace add Vinnehboom/claude-automation
+claude plugin install kanban-automation@vinnie-automation --scope user
 ```
 
-2. If you work in a terminal, run
-   `/plugin install kanban-automation@vinnie-automation`.
-3. If the project runs in a cloud session, add this command to the setup
-   script of the cloud environment:
+### In a cloud session
 
+The `/plugin` command does not exist in a cloud session. Put these three
+lines in the setup script of the environment instead:
+
+```sh
+claude plugin marketplace add Vinnehboom/claude-automation
+claude plugin marketplace update vinnie-automation
+claude plugin install kanban-automation@vinnie-automation --scope user
 ```
-claude plugin install kanban-automation@vinnie-automation --scope project
-```
 
-4. Trust the workspace when Claude Code asks for it. Project settings load
-   only after you trust the folder.
+CAUTION: Add this repository as a source on the ENVIRONMENT, not on one
+session. The add step clones it through the git proxy of the session, and
+that proxy allows only the repositories attached to the session. A public
+repository is not reachable for that reason alone. Without this source,
+the clone fails and the install reports `Plugin "kanban-automation" not
+found in marketplace "vinnie-automation"`. That message names the plugin,
+so it reads like a stale marketplace. It is an empty one.
 
-NOTE: The `/plugin` command does not exist in a cloud session. A plugin
-from an external source also does not load from `enabledPlugins` alone.
-The setup script of the environment does the install instead.
+Do not put `|| true` on these lines. The first two do the network work.
+If one of them fails and the script hides the failure, the only error you
+see is the third line's, and that error names the wrong cause.
+
+Use `--scope user`. `--scope project` writes the two keys into the
+project's tracked `.claude/settings.json`, which then shows as an
+uncommitted change in every session.
+
+Trust the workspace when Claude Code asks for it. Other project settings,
+such as permissions and hooks, load only after you trust the folder.
 
 ## Skill names change after the install
 
