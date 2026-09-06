@@ -60,7 +60,7 @@ Write it out with sections: Goal / **Risk classification** (Step 2.6's output) /
 - Small enough to review, large enough to mean something.
 
 ## Documentation style
-Write the plan with the `simple-english` skill (ASD-STE100, pragmatic mode). It ends up on the Notion ticket card and stays there — write it so a reader who is not a native English speaker gets it right the first time. Load the skill before you draft the plan.
+Write the plan with the `simple-english` skill (ASD-STE100, pragmatic mode). It ends up on the Notion ticket card and stays there — write it so a reader who is not a native English speaker gets it right the first time. Load the skill before you draft the plan. This plugin does not ship that skill; it comes from the project's own `.claude/skills/`. If the project has none, write ordinary clear prose instead.
 
 ## What you hand back
 The plan itself (the Goal/Risk classification/Convention check/Decisions/Branch/Commits/Open alternatives/Risks text), your decisions, and any dependency/branch call. Do not create the branch, write code, or write any repo file — keeping roles separate is what keeps the review honest.
