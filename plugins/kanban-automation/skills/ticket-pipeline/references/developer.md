@@ -20,6 +20,22 @@ git config user.email "vinnie.schelfhaut.95@hotmail.com"
 Read the cached Coding Style Guide (`docs/pipeline-cache/<TASK_ID>/style-guide.md`) before writing anything, treat it as binding. It outranks a nearby pattern when they disagree. Also match the surrounding code's idiom and ordinary best practices.
 If a style-guide rule collides with tooling (.rubocop.yml), don't silently pick a side. Follow the guide for the code you write, get the commit green, and note the conflict in your hand-back for the curator (there's a tech-debt page).
 
+### The rules that keep coming back
+The guide holds about forty rules in one list. The eight below are the ones the repo owner has corrected by hand more than once. They are the ones to hold when the ticket, the plan and the code are all competing for your attention.
+
+This block is a copy. The project's `CLAUDE.md` and the hot list at the top of the cached style guide are the canonical versions. If the project's `CLAUDE.md` carries its own hot list, that list replaces this one.
+
+Rules 1 to 4 are one cluster, and they are the most corrected rule in the repository. A comment is a model reflex. Suppress it.
+
+1. Write no comment that restates the line below it.
+2. Write no decision, no rationale, and no design history in a comment. A comment can still explain a non-obvious workaround or an invariant.
+3. Refer to no decision from code. No ticket id, no Decisions row, no review round, no finding number. State what will break, not which ticket found it.
+4. Write no comment that points at a shared example or a contract module. Its own name and content already say what it covers.
+5. Read constructor state in a service object through a private `attr_reader`. Do not read a bare `@ivar`.
+6. Extract repeated or incidental spec setup into a named helper method.
+7. Send the message. Do not branch on the class or the type of an object.
+8. Squash every `fixup!` commit before you push.
+
 ## Step 3 — Work the commits, test-first
 For each commit: write the failing spec, minimum code to pass, refactor green, keep spec+code in the SAME commit. Follow the plan's sequence. If reality diverges, note it and adapt within "open alternatives"; if it contradicts a settled decision, raise it.
 
@@ -28,6 +44,8 @@ After implementation, look again for paths the plan's specs don't exercise. Add 
 
 ## The commit gate — every time
 Before EACH commit run the linter and the specs that cover what you touched: the spec file for each file you changed, plus any spec exercising code that calls into it (grep for the class/method name to find those) — not the whole suite. This local gate is there to keep you honest commit-by-commit; it isn't meant to duplicate CI. Both must pass. No commit on a red run or lint failure; no unjustified lint disables. If you can't make them pass, stop and surface it. GitHub CI runs the full suite on every push and is the actual full-suite safety net — the Gatekeeper (skill Phase 5) won't mark a PR ready until it's green there.
+
+**Read the staged diff against the hot list before each commit.** Run `git diff --cached` and read every comment line the diff adds. If a comment restates its next line, records a decision or its rationale, or points at a shared example, remove it now. Linting catches only the part of rule 3 that a regular expression can match. Rules 1, 2 and 4 have no tool behind them, so this read is the only check they get before review.
 
 **A worktree that "just happens to work" locally can be lying to you about a real CI dependency.** Standing instruction, 2026-08-26: on H-1's CI config, a developer dropped a CircleCI job's `assets:precompile` step after confirming locally that specs passed without it — but `public/assets` had already been populated by an earlier, unrelated precompile run left over in that same reused worktree, so the test never actually exercised the no-precompile case it claimed to verify. A real CircleCI job gets a fresh container every time; this sandbox's worktrees don't, and can silently carry state (compiled assets, a populated test DB, an installed gem, a written file) from whatever ran in them earlier in the session. Before trusting a local pass/fail on anything that depends on build/setup state rather than pure code logic (asset compilation, migrations, a generated file, an installed dependency), either clear the relevant state first (e.g. `rm -rf public/assets`) or explicitly reason about why the state you're testing against is actually representative of a fresh run — don't assume a shared sandbox starts as clean as CI's container does.
 
