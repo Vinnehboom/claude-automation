@@ -16,6 +16,11 @@ the project that uses the plugin.
 | `handoff` | Retires the standing orchestrator session and gives the role to a new session. |
 | `coding-style` | Records a durable style preference into the style guide page of the project. |
 
+The plugin also ships `scripts/ui_capture/`, the screenshot driver the
+`ticket-pipeline` Gatekeeper runs. Address it as
+`${CLAUDE_PLUGIN_ROOT}/scripts/ui_capture/run.sh` — the install path carries
+the plugin version, so never write it out by hand.
+
 ## What each project supplies
 
 The plugin reads these files from the project repository. Create them
@@ -24,9 +29,14 @@ before you enable the plugin:
 - `.claude/kanban-cycle.json` — the repository, the board URL, and the caps.
 - `.claude/knowledge-base.json` — the knowledge base, decisions, and tech debt pages.
 - `.claude/coding-style.json` — the style guide page.
+- `.claude/ui-capture.json` — how to boot the app, how to list its own
+  page-rendering routes, and how to sign in. Only the Gatekeeper's UI
+  capture reads this one. A project without it skips the capture with a
+  clear message. See `plugins/kanban-automation/scripts/ui_capture/README.md`.
 
 Each project also keeps its own session-start hook. That hook installs the
-test environment of one project, so it cannot move into this plugin.
+test environment of one project, so it cannot move into this plugin. The
+boot script that `.claude/ui-capture.json` names is the same case.
 
 ### The `simple-english` skill stays with each project
 
