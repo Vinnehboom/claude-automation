@@ -14,7 +14,6 @@ the project that uses the plugin.
 | `kanban-cycle` | Runs one scheduled review cycle. It triages open pull requests first, then starts at most one new ticket. |
 | `ticket-pipeline` | Drives one ticket from its Notion card to a reviewed pull request. |
 | `handoff` | Retires the standing orchestrator session and gives the role to a new session. |
-| `simple-english` | Writes technical text with the rules of ASD-STE100. |
 | `coding-style` | Records a durable style preference into the style guide page of the project. |
 
 ## What each project supplies
@@ -28,6 +27,17 @@ before you enable the plugin:
 
 Each project also keeps its own session-start hook. That hook installs the
 test environment of one project, so it cannot move into this plugin.
+
+### The `simple-english` skill stays with each project
+
+The `ticket-pipeline` briefs tell the planner, the developer, and the
+curator to write their prose with a `simple-english` skill. This plugin
+does not supply that skill, and it does not ship a copy of ASD-STE100.
+Keep your own copy in the project's `.claude/skills/`, under whatever
+terms you hold it under.
+
+If a project has no such skill, those instructions find nothing and the
+phase writes ordinary prose. Nothing else breaks.
 
 ## Install the plugin in a project
 
