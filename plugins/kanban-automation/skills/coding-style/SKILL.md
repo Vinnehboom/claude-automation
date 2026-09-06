@@ -12,13 +12,20 @@ description: >-
 
 # Coding Style skill
 
-Maintains the living **Coding Style Guide** Notion page — the single source of
-truth for Vinnie's durable coding-style preferences on this repo. The page has
-two parts: **Style Rules** (distilled imperative bullets, grouped by category)
-and an append-only **Change Log** (dated history of each addition).
+Maintains the living **Coding Style Guide** in Notion — the single source of
+truth for Vinnie's durable coding-style preferences on this repo. It has two
+halves:
 
-Do not hardcode the page ID here. Read it from `.claude/coding-style.json` at
-the repo root (`notion_page_id` / `notion_page_url`).
+- The **Style Rules database** (`rules_database` in `.claude/coding-style.json`).
+  One row per rule. The row title IS the rule, written as a terse imperative.
+  The row's page body holds the reasoning, the boundaries and the exceptions —
+  what a reader consults when the one-line rule leaves doubt. Columns:
+  `Category`, `Status` (Active/Superseded), `Hot list`, `Enforced by`, `Added`.
+- The **guide page** (`notion_page_url`), which keeps the intro callout, the
+  hot list, and the append-only **Change Log**.
+
+Do not hardcode either ID here. Read both from `.claude/coding-style.json` at
+the repo root.
 
 ## When to trigger
 
@@ -35,9 +42,9 @@ Only capture when it reads as a *durable* preference, not a one-off:
 
 ## What to write
 
-1. **Read** `.claude/coding-style.json` → get the page ID.
-2. **Fetch** the Notion page to see current sections and existing rules (so you
-   don't duplicate an existing rule — refine it in place instead).
+1. **Read** `.claude/coding-style.json` → get the page and database pointers.
+2. **Fetch** the guide page AND query the rules database, so you see every
+   existing rule (do not duplicate one — refine it in place instead).
 3. **Test for a repeat before you write anything.** Read the Style Rules and
    the Change Log. Ask whether the guide already carries this rule, in any
    wording. A repeat is a correction of a rule that is already written down.
@@ -66,17 +73,22 @@ Only capture when it reads as a *durable* preference, not a one-off:
    Then go to step 6. Steps 4 and 5 are for a rule the guide does not have
    yet.
 
-4. **Distill** the preference into a short, imperative bullet: a bold lead
-   phrase stating the rule, then a sentence of the *why* / boundary. Match the
-   voice of the existing bullets.
-5. **Place it** under the correct existing heading. Current categories:
+4. **Distill** the preference into a row. The **title** is the rule alone, as
+   one terse imperative sentence — no rationale, no hedging, no "because".
+   The **page body** carries the why, the boundary, the exception, and the
+   source. Split them deliberately: a title that needs a subordinate clause is
+   two rules or a body sentence. Match the voice of the existing rows.
+5. **Set the columns.** `Status` is Active. `Hot list` is unchecked unless
+   step 3 promoted it. `Enforced by` names the cop, script or hook if one
+   exists, and stays empty otherwise — an empty value is the signal that this
+   rule can only be held by hand. `Added` is today. `Category` is one of:
    Naming Conventions · Structure & Architecture · Error Handling ·
    Comments & Documentation · Testing · Formatting · Ruby / Rails Specific ·
    JavaScript Specific · Anti-patterns to Avoid · General. Replace a section's
-   `*No entries yet.*` placeholder with the first real bullet. Don't invent new
-   headings unless no existing category fits. The hot list at the top of the
-   page is not one of these categories. A rule reaches it by promotion
-   (step 3), never as the first home for a new rule.
+   Don't invent a new category unless no existing one fits — adding a
+   `Category` option is a schema change, so ask first. The hot list is a
+   column, not a category. A rule reaches it by promotion (step 3), never as
+   the first home for a new rule.
 6. **Prepend a Change Log line** (newest at top) in the exact format:
    `YYYY-MM-DD — <category>: <what changed> (context: <brief source, e.g. file/ticket/discussion>)`
    Anchor this edit on the first existing `- ` bullet under `## Change Log`.
@@ -97,8 +109,11 @@ Only capture when it reads as a *durable* preference, not a one-off:
 
 ## Guardrails
 
-- Only ever edit the **hot list**, the **Style Rules**, and the **Change
-  Log** sections. Leave the intro callout and section structure alone.
+- Only ever add or edit **rows** in the Style Rules database, and the **hot
+  list** and **Change Log** sections of the guide page. Leave the intro
+  callout alone. Never change the database schema, its columns, or its views.
+- Retire a rule by setting its `Status` to Superseded, never by deleting the
+  row. The history is the point.
 - The hot list has three copies: the top of the Notion page, the project's
   `CLAUDE.md`, and `references/developer.md`. A change to one is a change to
   all three. A copy that drifts is worse than no copy.
