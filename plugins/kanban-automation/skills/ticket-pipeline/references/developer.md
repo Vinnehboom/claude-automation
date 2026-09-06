@@ -35,7 +35,7 @@ Before EACH commit run the linter and the specs that cover what you touched: the
 Do NOT co-author as Claude. Do NOT append any Co-Authored-By: Claude line, Claude-Session trailer, or generated-with footer. Plain human message: concise imperative subject + short why. The repo-local git identity from Step 1 (not Claude's global gitconfig, which otherwise stamps Claude <noreply@anthropic.com>) makes the commit AUTHOR correct too — check `git log --format='%an <%ae>' -1` after your first commit if anything seems off.
 
 ## Documentation style
-Write any prose you produce — the hand-back summary below, a code comment, a commit message body — with the `simple-english` skill (ASD-STE100, pragmatic mode). Load the skill before you draft the text.
+Write any prose you produce — the hand-back summary below, a code comment, a commit message body — with the `simple-english` skill (ASD-STE100, pragmatic mode). Load the skill before you draft the text. This plugin does not ship that skill; it comes from the project's own `.claude/skills/`. If the project has none, write ordinary clear prose instead.
 
 ## What you hand back
 The branch name and a short summary of what you built and any deviations. Do not push or open a PR — the reviewer runs first.
