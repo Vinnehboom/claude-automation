@@ -38,16 +38,46 @@ Only capture when it reads as a *durable* preference, not a one-off:
 1. **Read** `.claude/coding-style.json` → get the page ID.
 2. **Fetch** the Notion page to see current sections and existing rules (so you
    don't duplicate an existing rule — refine it in place instead).
-3. **Distill** the preference into a short, imperative bullet: a bold lead
+3. **Test for a repeat before you write anything.** Read the Style Rules and
+   the Change Log. Ask whether the guide already carries this rule, in any
+   wording. A repeat is a correction of a rule that is already written down.
+
+   When it is a repeat, do NOT append a new bullet. Four bullets about code
+   comments exist because four repeats were each answered with a fifth
+   bullet. A rule that keeps coming back is not under-written. It is
+   unenforced. Writing it down harder is the one response the record shows
+   does not work. Answer a repeat this way instead:
+
+   - **Sharpen the existing bullet in place**, when the wording is genuinely
+     loose. Give it no neighbour.
+   - **Promote it to the hot list** at the top of the guide, when it is not
+     there already. Mirror the same line into the project's `CLAUDE.md` hot
+     list and into `references/developer.md`. All three copies must stay
+     identical.
+   - **Propose a mechanical check** when a machine can test the rule — a
+     rubocop cop, a lint rule, a git hook. Say so to the user and let them
+     decide whether to file a ticket for it. Every rule with a cop behind it
+     has stayed fixed. The rules that recur are the ones with nothing
+     mechanical behind them.
+   - **Record the repeat in the Change Log** as a promotion, not as a new
+     rule: `YYYY-MM-DD — <category>: promoted <rule> to the hot list after a
+     repeat (context: ...)`.
+
+   Then go to step 6. Steps 4 and 5 are for a rule the guide does not have
+   yet.
+
+4. **Distill** the preference into a short, imperative bullet: a bold lead
    phrase stating the rule, then a sentence of the *why* / boundary. Match the
    voice of the existing bullets.
-4. **Place it** under the correct existing heading. Current categories:
+5. **Place it** under the correct existing heading. Current categories:
    Naming Conventions · Structure & Architecture · Error Handling ·
    Comments & Documentation · Testing · Formatting · Ruby / Rails Specific ·
    JavaScript Specific · Anti-patterns to Avoid · General. Replace a section's
    `*No entries yet.*` placeholder with the first real bullet. Don't invent new
-   headings unless no existing category fits.
-5. **Prepend a Change Log line** (newest at top) in the exact format:
+   headings unless no existing category fits. The hot list at the top of the
+   page is not one of these categories. A rule reaches it by promotion
+   (step 3), never as the first home for a new rule.
+6. **Prepend a Change Log line** (newest at top) in the exact format:
    `YYYY-MM-DD — <category>: <what changed> (context: <brief source, e.g. file/ticket/discussion>)`
    Anchor this edit on the first existing `- ` bullet under `## Change Log`.
    Set `old_str` to that whole bullet line. Set `new_str` to your new
@@ -58,17 +88,20 @@ Only capture when it reads as a *durable* preference, not a one-off:
    stray `2026-09-02 — Structure & Architecture:` prefix from the bullet
    above it, and another had the format line spliced onto its end.
    Repaired 2026-09-05, on Vinnie's request.
-6. **Re-fetch the page and read the top three Change Log bullets.** If a
+7. **Re-fetch the page and read the top three Change Log bullets.** If a
    line is split, merged, duplicated, or carries text from its neighbor,
    correct it now. A corrupted entry looks fine to the writer. It stays
    invisible until somebody reads the log months later.
-7. **Confirm** back to the user with a one-liner ("Added under Testing: ...") —
-   do not dump the whole doc back.
+8. **Confirm** back to the user with a one-liner ("Added under Testing: ...",
+   or "Promoted to the hot list: ...") — do not dump the whole doc back.
 
 ## Guardrails
 
-- Only ever edit the **Style Rules** and **Change Log** sections. Leave the
-  intro callout and section structure alone.
+- Only ever edit the **hot list**, the **Style Rules**, and the **Change
+  Log** sections. Leave the intro callout and section structure alone.
+- The hot list has three copies: the top of the Notion page, the project's
+  `CLAUDE.md`, and `references/developer.md`. A change to one is a change to
+  all three. A copy that drifts is worse than no copy.
 - **Never fabricate a preference.** Capture only what the user actually stated
   or clearly implied. If you're inferring, ask first.
 - Keep bullets terse and imperative — this doc is read as binding guidance by
