@@ -57,10 +57,12 @@ Only capture when it reads as a *durable* preference, not a one-off:
 
    - **Sharpen the existing bullet in place**, when the wording is genuinely
      loose. Give it no neighbour.
-   - **Promote it to the hot list** at the top of the guide, when it is not
-     there already. Mirror the same line into the project's `CLAUDE.md` hot
-     list and into `references/developer.md`. All three copies must stay
-     identical.
+   - **Promote it to the hot list**: tick the row's `Hot list` column, when
+     it is not ticked already. Then mirror the same one-line rule into the
+     project's `CLAUDE.md` hot list. Those are the only two places it
+     lives — the column and that one text copy, which exists because
+     `CLAUDE.md` auto-loads into every dispatch and still works when Notion
+     is unreachable. Do not add a third.
    - **Propose a mechanical check** when a machine can test the rule — a
      rubocop cop, a lint rule, a git hook. Say so to the user and let them
      decide whether to file a ticket for it. Every rule with a cop behind it
@@ -114,9 +116,11 @@ Only capture when it reads as a *durable* preference, not a one-off:
   callout alone. Never change the database schema, its columns, or its views.
 - Retire a rule by setting its `Status` to Superseded, never by deleting the
   row. The history is the point.
-- The hot list has three copies: the top of the Notion page, the project's
-  `CLAUDE.md`, and `references/developer.md`. A change to one is a change to
-  all three. A copy that drifts is worse than no copy.
+- The hot list lives in exactly two places: the `Hot list` column on the
+  rules database, and the project's `CLAUDE.md`. A change to one is a change
+  to both. Never add a third — a copy that drifts is worse than no copy,
+  and the guide page and the developer brief each carried one until the
+  column replaced them.
 - **Never fabricate a preference.** Capture only what the user actually stated
   or clearly implied. If you're inferring, ask first.
 - Keep bullets terse and imperative — this doc is read as binding guidance by

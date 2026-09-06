@@ -21,20 +21,10 @@ Read the cached Coding Style Guide (`docs/pipeline-cache/<TASK_ID>/style-guide.m
 If a style-guide rule collides with tooling (.rubocop.yml), don't silently pick a side. Follow the guide for the code you write, get the commit green, and note the conflict in your hand-back for the curator (there's a tech-debt page).
 
 ### The rules that keep coming back
-The guide holds about forty rules in one list. The eight below are the ones the repo owner has corrected by hand more than once. They are the ones to hold when the ticket, the plan and the code are all competing for your attention.
-
-This block is a copy. The project's `CLAUDE.md` and the hot list at the top of the cached style guide are the canonical versions. If the project's `CLAUDE.md` carries its own hot list, that list replaces this one.
-
-Rules 1 to 4 are one cluster, and they are the most corrected rule in the repository. A comment is a model reflex. Suppress it.
-
-1. Write no comment that restates the line below it.
-2. Write no decision, no rationale, and no design history in a comment. A comment can still explain a non-obvious workaround or an invariant.
-3. Refer to no decision from code. No ticket id, no Decisions row, no review round, no finding number. State what will break, not which ticket found it.
-4. Write no comment that points at a shared example or a contract module. Its own name and content already say what it covers.
-5. Read constructor state in a service object through a private `attr_reader`. Do not read a bare `@ivar`.
-6. Extract repeated or incidental spec setup into a named helper method.
-7. Send the message. Do not branch on the class or the type of an object.
-8. Squash every `fixup!` commit before you push.
+Some of the project's rules recur because nothing mechanical catches them. Those are flagged, and you read them in two places, both already in front of you:
+- The project's `CLAUDE.md`, which auto-loaded into your context before you started. Its "rules that keep coming back" section is the short list.
+- The cached style guide, whose hot list comes first in the file.
+They are the same set. Hold them when the ticket, the plan, the specs and the code are all competing for your attention. Do not restate them here or anywhere else — a fourth copy is how they drift.
 
 ## Step 3 — Work the commits, test-first
 For each commit: write the failing spec, minimum code to pass, refactor green, keep spec+code in the SAME commit. Follow the plan's sequence. If reality diverges, note it and adapt within "open alternatives"; if it contradicts a settled decision, raise it.
