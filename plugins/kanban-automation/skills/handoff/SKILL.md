@@ -150,10 +150,19 @@ taking over from session <predecessor id>.
 
 Do these in order, then stop and stay idle until a Routine fires:
 
-1. Read docs/orchestrator-handoff.md in this repo.
-2. Find your own session ID: the claude-code-remote MCP get_session tool
+1. FIRST, before anything else, make sure that the kanban-automation
+   plugin is loaded: run /plugin list, or look for skills named
+   kanban-automation:*. If it is ABSENT, STOP HERE. Change nothing. Do
+   not re-point a Routine, do not subscribe to a PR, and do not archive
+   the predecessor. Reply with one message saying the plugin did not
+   load. The predecessor keeps the role until a person fixes the cause.
+   An orchestrator without its own skills cannot run a cycle and cannot
+   hand off again, and every step below would move the automation onto
+   it.
+2. Read docs/orchestrator-handoff.md in this repo.
+3. Find your own session ID: the claude-code-remote MCP get_session tool
    with session_id omitted describes this session.
-3. Re-point every recurring Routine at yourself. list_triggers shows them;
+4. Re-point every recurring Routine at yourself. list_triggers shows them;
    each is currently bound to the predecessor via persistent_session_id.
    That field cannot be changed by update_trigger, so for EACH trigger:
    create a new one with the same name, the same cron_expression, the same
@@ -161,23 +170,23 @@ Do these in order, then stop and stay idle until a Routine fires:
    delete the old one. Create before deleting, so a failure leaves the
    automation running rather than stranded. Verify with list_triggers that
    the count is unchanged and every trigger now names you.
-4. Re-subscribe to every open PR. PR subscriptions belong to the session
+5. Re-subscribe to every open PR. PR subscriptions belong to the session
    that made them, and they die with it. List the repo's open PRs and
    call subscribe_pr_activity for each one this automation drives (any
    PR whose body links a Notion ticket card, plus any PR opened for the
    automation itself). Without this the successor never learns about a
    CI failure or a review comment on work already in flight.
-5. Write one entry to the dashboard's cycle log, so the board shows
+6. Write one entry to the dashboard's cycle log, so the board shows
    the generation change instead of a silent gap. The board is the
    Artifact at dashboard_artifact_url in .claude/kanban-cycle.json;
    step 7 of the kanban-cycle skill gives the document shape. Write to
    that URL — do not publish a new artifact.
-6. Do the "pending automation work" listed in the handoff note.
-7. Archive the predecessor: archive_session with its session ID. Only
-   after steps 3 and 4 verified — an archived session that still owns
+7. Do the "pending automation work" listed in the handoff note.
+8. Archive the predecessor: archive_session with its session ID. Only
+   after steps 4 and 5 verified — an archived session that still owns
    triggers would silently drop every scheduled cycle, and archiving
    before re-subscribing loses PR events in the gap.
-8. Report back in one short message: generation number, triggers
+9. Report back in one short message: generation number, triggers
    re-pointed, PRs re-subscribed, dashboard entry written, automation
    work done. Raise anything that failed. Do not restate the board's state — the next scheduled
    cycle covers that.
@@ -187,10 +196,6 @@ and answer the user directly when they message you. The cycle skill comes
 from the kanban-automation plugin. Load it when the first cycle fires — do
 not load it now, it costs context you do not need yet.
 
-Before you report back, make sure that the plugin is loaded: run
-/plugin list, or look for the kanban-automation skills. If the plugin is
-absent, say so in your report and stop. An orchestrator without its own
-skills cannot run a cycle and cannot hand off again.
 ```
 
 The successor does the re-pointing, not the predecessor, for two reasons:
@@ -267,8 +272,14 @@ yourself — the successor owns that, and doing it early strands the Routines.
   `source_url`, and `add_repo` runs in a turn. A turn is after the setup
   script has already run and failed.
 
-  The successor's own report says whether the plugin loaded. If the
-  report says it did not, treat the handoff as failed: keep the Routines
-  on the predecessor and fix the cause first. A successor can repair
+  The successor checks this itself, as step 1 of its seed prompt, and
+  stops before it changes anything. That order matters: an earlier
+  version put the check last, after the successor had already re-pointed
+  every Routine and archived the predecessor. A successor that reported
+  "the plugin did not load" had by then already moved both scheduled
+  cycles onto itself and retired the only session that could still run
+  them. If its report says the plugin is absent, treat the handoff as
+  failed: the Routines are still on the predecessor, so fix the cause and
+  spawn again. A successor can repair
   itself with `add_repo` and a manual install. Every generation then
   needs a person, which is what this skill exists to avoid.
