@@ -118,8 +118,11 @@ mkdir -p "$RUN_DIR"
 fetch_credentials() {
   local err
   err="$(mktemp)"
-  if ! IFS='|' read -r DB_NAME DB_USERNAME DB_PASSWORD < <(sh -c "$DB_CREDENTIALS_COMMAND" 2>"$err" | tail -1) \
-    || [ -z "$DB_NAME" ]; then
+  # `read`'s own exit status also signals "no trailing newline on the
+  # last line", which a well-formed one-line command can legitimately
+  # produce -- the real success test is whether a name came out of it.
+  IFS='|' read -r DB_NAME DB_USERNAME DB_PASSWORD < <(sh -c "$DB_CREDENTIALS_COMMAND" 2>"$err" | tail -1)
+  if [ -z "$DB_NAME" ]; then
     log "could not read database credentials:"
     cat "$err" >&2
     rm -f "$err"
@@ -158,7 +161,7 @@ stop() {
     fi
   fi
 
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$RUN_DIR/server.pid"
 }
 
 if [ "$STOP" = true ]; then
@@ -177,8 +180,9 @@ if [ -f "$STATE_FILE" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# The state file is `source`d by --stop, so every value going into it is
-# shell-quoted rather than interpolated raw.
+# --stop `source`s the state file, so every value written here must be
+# shell-quoted: db_credentials_command and server_command are project-
+# supplied, and RUN_DB/BASE_URL are built from their output.
 # ---------------------------------------------------------------------------
 write_state() {
   printf '%s=%q\n' "$1" "$2" >> "$STATE_FILE"
@@ -186,10 +190,10 @@ write_state() {
 
 # ---------------------------------------------------------------------------
 # Failure trap -- from here on, any non-zero exit drops the run database and
-# kills the server. The state file is written incrementally as each piece
-# comes up (RUN_DB, then SERVER_PID, then BASE_URL) rather than once at the
-# end, so a SIGKILL that bypasses this trap entirely still leaves --stop
-# enough to find and tear down whatever had already started.
+# kills the server. write_state() above lands each piece (RUN_DB, then
+# SERVER_PID, then BASE_URL) on disk as soon as it exists, so even a
+# SIGKILL -- which this trap, like any trap, cannot catch -- still leaves
+# --stop enough on disk to find and tear down whatever had started.
 # ---------------------------------------------------------------------------
 RUN_DB=""
 SERVER_PID=""
@@ -255,6 +259,13 @@ fetch_credentials || exit 2
 # Drop and recreate a per-run database named by a suffix.
 # ---------------------------------------------------------------------------
 RUN_DB="${DB_NAME}${RUN_SUFFIX}"
+# PostgreSQL silently truncates an identifier past NAMEDATALEN (63 bytes
+# by default), which would make this run's database collide with
+# another ticket's -- fail loudly instead of seeding the wrong database.
+if [ "${#RUN_DB}" -gt 63 ]; then
+  log "run database name '$RUN_DB' is ${#RUN_DB} bytes, over PostgreSQL's 63-byte identifier limit -- shorten db_credentials_command's database name or the ticket ID"
+  exit 1
+fi
 write_state RUN_DB "$RUN_DB"
 PGPASSWORD="$DB_PASSWORD" dropdb -h 127.0.0.1 -U "$DB_USERNAME" --if-exists "$RUN_DB"
 log "setting up $RUN_DB"
@@ -278,10 +289,15 @@ free_port() {
   '
 }
 
-# A server that exits non-zero, or never gets as far as writing its
-# pidfile, can still have forked the process it was about to name in that
-# pidfile -- check for one and kill it before moving on, the same as the
-# health-poll-failure path below already does.
+# A server that backgrounds the real listener and then exits non-zero
+# (a launcher whose own post-check failed) can still have a pidfile on
+# disk naming that listener -- check for one and kill it before moving
+# on, the same as the health-poll-failure path below already does. A
+# server that never writes a pidfile at all leaves nothing here to find:
+# without a recorded pid there is no way for this harness to identify,
+# and so no way to reclaim, whatever it may have forked. Writing the
+# pidfile before returning is a hard requirement of server_command, not
+# a nicety -- see README.md.
 kill_leaked_server() {
   [ -f "$PIDFILE" ] || return 0
   local pid
@@ -290,6 +306,11 @@ kill_leaked_server() {
   log "killing leaked server process $pid from failed attempt"
   kill "$pid" 2>/dev/null || true
 }
+
+# Both loops below poll twice a second; tests shrink these to make a
+# never-satisfied wait cheap to exercise without changing real behavior.
+PIDFILE_WAIT_TRIES="${UI_CAPTURE_PIDFILE_WAIT_TRIES:-60}"
+HEALTH_POLL_TRIES="${UI_CAPTURE_HEALTH_POLL_TRIES:-60}"
 
 PIDFILE="$RUN_DIR/server.pid"
 BASE_URL=""
@@ -309,20 +330,19 @@ for attempt in $(seq 1 "$START_ATTEMPTS"); do
   fi
 
   CANDIDATE_URL="http://127.0.0.1:${PORT}"
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 "$PIDFILE_WAIT_TRIES"); do
     [ -f "$PIDFILE" ] && break
     sleep 0.5
   done
   if [ ! -f "$PIDFILE" ]; then
     log "server never wrote a pidfile on port $PORT, retrying"
-    kill_leaked_server
     continue
   fi
   SERVER_PID="$(cat "$PIDFILE")"
   write_state SERVER_PID "$SERVER_PID"
 
   READY=false
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 "$HEALTH_POLL_TRIES"); do
     if curl -fsS -o /dev/null "$CANDIDATE_URL$HEALTH_PATH" 2>/dev/null; then
       READY=true
       break
