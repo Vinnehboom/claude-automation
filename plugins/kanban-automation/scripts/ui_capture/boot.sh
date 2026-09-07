@@ -36,8 +36,8 @@ STOP=false
 DIR_OVERRIDE=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --ticket) TICKET="$2"; shift 2 ;;
-    --dir) DIR_OVERRIDE="$2"; shift 2 ;;
+    --ticket) [ $# -ge 2 ] || usage; TICKET="$2"; shift 2 ;;
+    --dir) [ $# -ge 2 ] || usage; DIR_OVERRIDE="$2"; shift 2 ;;
     --stop) STOP=true; shift ;;
     *) usage ;;
   esac
@@ -104,7 +104,7 @@ default_main_checkout() {
 }
 MAIN_CHECKOUT="${UI_CAPTURE_MAIN_CHECKOUT:-$(default_main_checkout || echo "$PROJECT_DIR")}"
 
-SANITIZED_TICKET="$(echo "$TICKET" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')"
+SANITIZED_TICKET="$(printf '%s' "$TICKET" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_' '_')"
 [ -n "$SANITIZED_TICKET" ] || { log "ticket '$TICKET' sanitizes to an empty run-db name"; exit 1; }
 RUN_SUFFIX="_${SANITIZED_TICKET}"
 
@@ -118,7 +118,7 @@ mkdir -p "$RUN_DIR"
 fetch_credentials() {
   local err
   err="$(mktemp)"
-  if ! IFS='|' read -r DB_NAME DB_USERNAME DB_PASSWORD < <(sh -c "$DB_CREDENTIALS_COMMAND" 2>"$err") \
+  if ! IFS='|' read -r DB_NAME DB_USERNAME DB_PASSWORD < <(sh -c "$DB_CREDENTIALS_COMMAND" 2>"$err" | tail -1) \
     || [ -z "$DB_NAME" ]; then
     log "could not read database credentials:"
     cat "$err" >&2
@@ -166,10 +166,30 @@ if [ "$STOP" = true ]; then
   exit 0
 fi
 
+# A second boot for a ticket that already has one running would have its
+# db_setup_commands drop the first run's database out from under it, and
+# then only ever see this second boot's state -- orphaning the first
+# server. Refuse rather than silently stomping on it; --stop clears the
+# way for a retry.
+if [ -f "$STATE_FILE" ]; then
+  log "boot state already exists for ticket '$TICKET' ($STATE_FILE) -- stop that run first (--stop) before booting again"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# The state file is `source`d by --stop, so every value going into it is
+# shell-quoted rather than interpolated raw.
+# ---------------------------------------------------------------------------
+write_state() {
+  printf '%s=%q\n' "$1" "$2" >> "$STATE_FILE"
+}
+
 # ---------------------------------------------------------------------------
 # Failure trap -- from here on, any non-zero exit drops the run database and
-# kills the server, even though the state file (which --stop normally reads)
-# isn't written until the very end of a successful boot.
+# kills the server. The state file is written incrementally as each piece
+# comes up (RUN_DB, then SERVER_PID, then BASE_URL) rather than once at the
+# end, so a SIGKILL that bypasses this trap entirely still leaves --stop
+# enough to find and tear down whatever had already started.
 # ---------------------------------------------------------------------------
 RUN_DB=""
 SERVER_PID=""
@@ -186,14 +206,17 @@ cleanup_on_failure() {
   if [ -n "$RUN_DB" ] && [ -n "${DB_USERNAME:-}" ]; then
     PGPASSWORD="${DB_PASSWORD:-}" dropdb -h 127.0.0.1 -U "$DB_USERNAME" --if-exists "$RUN_DB" 2>/dev/null || true
   fi
+  rm -f "$STATE_FILE"
 }
 trap cleanup_on_failure EXIT
 
 set -e
 
-# One log for every build/install command this run makes, truncated here so
-# a run reusing the same --dir never appends onto an earlier run's log.
+# One log for every build/install command this run makes, and one for the
+# server's own boot attempts, truncated here so a run reusing the same
+# --dir never appends onto an earlier run's log.
 : > "$RUN_DIR/build.log"
+: > "$RUN_DIR/server-boot.log"
 
 # ---------------------------------------------------------------------------
 # Hydrate the worktree: node_modules unconditionally; anything else the
@@ -232,6 +255,7 @@ fetch_credentials || exit 2
 # Drop and recreate a per-run database named by a suffix.
 # ---------------------------------------------------------------------------
 RUN_DB="${DB_NAME}${RUN_SUFFIX}"
+write_state RUN_DB "$RUN_DB"
 PGPASSWORD="$DB_PASSWORD" dropdb -h 127.0.0.1 -U "$DB_USERNAME" --if-exists "$RUN_DB"
 log "setting up $RUN_DB"
 for cmd in "${DB_SETUP_COMMANDS[@]}"; do
@@ -254,6 +278,19 @@ free_port() {
   '
 }
 
+# A server that exits non-zero, or never gets as far as writing its
+# pidfile, can still have forked the process it was about to name in that
+# pidfile -- check for one and kill it before moving on, the same as the
+# health-poll-failure path below already does.
+kill_leaked_server() {
+  [ -f "$PIDFILE" ] || return 0
+  local pid
+  pid="$(cat "$PIDFILE" 2>/dev/null)"
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null || return 0
+  log "killing leaked server process $pid from failed attempt"
+  kill "$pid" 2>/dev/null || true
+}
+
 PIDFILE="$RUN_DIR/server.pid"
 BASE_URL=""
 START_ATTEMPTS=3
@@ -265,8 +302,9 @@ for attempt in $(seq 1 "$START_ATTEMPTS"); do
   SERVER_CMD="${SERVER_CMD//\{pidfile\}/$PIDFILE}"
 
   log "starting server on port $PORT against $RUN_DB (attempt $attempt/$START_ATTEMPTS)"
-  if ! env "$RUN_SUFFIX_VAR=$RUN_SUFFIX" sh -c "$SERVER_CMD" >"$RUN_DIR/server-boot.log" 2>&1; then
+  if ! env "$RUN_SUFFIX_VAR=$RUN_SUFFIX" sh -c "$SERVER_CMD" >>"$RUN_DIR/server-boot.log" 2>&1; then
     log "server failed to start on port $PORT, retrying"
+    kill_leaked_server
     continue
   fi
 
@@ -277,13 +315,15 @@ for attempt in $(seq 1 "$START_ATTEMPTS"); do
   done
   if [ ! -f "$PIDFILE" ]; then
     log "server never wrote a pidfile on port $PORT, retrying"
+    kill_leaked_server
     continue
   fi
   SERVER_PID="$(cat "$PIDFILE")"
+  write_state SERVER_PID "$SERVER_PID"
 
   READY=false
   for _ in $(seq 1 60); do
-    if curl -fsS -o /dev/null -w '%{http_code}' "$CANDIDATE_URL$HEALTH_PATH" 2>/dev/null | grep -q '^200$'; then
+    if curl -fsS -o /dev/null "$CANDIDATE_URL$HEALTH_PATH" 2>/dev/null; then
       READY=true
       break
     fi
@@ -303,11 +343,7 @@ done
 
 [ -n "$BASE_URL" ] || { log "could not start server after $START_ATTEMPTS attempts"; exit 2; }
 
-cat > "$STATE_FILE" <<EOF
-SERVER_PID=$SERVER_PID
-RUN_DB=$RUN_DB
-BASE_URL=$BASE_URL
-EOF
+write_state BASE_URL "$BASE_URL"
 
 log "ready: $BASE_URL (db $RUN_DB, pid $SERVER_PID)"
 echo "BASE_URL=$BASE_URL"
