@@ -97,3 +97,10 @@ jobs:
           npm install -g @anthropic-ai/claude-code
           claude plugin validate .
           claude plugin validate plugins/kanban-automation
+
+      - name: UI-capture boot harness (shell syntax + synthetic suite)
+        run: |
+          set -e
+          bash -n plugins/kanban-automation/scripts/ui_capture/boot.sh
+          bash -n plugins/kanban-automation/scripts/ui_capture/run.sh
+          plugins/kanban-automation/scripts/ui_capture/test/run_tests.sh
