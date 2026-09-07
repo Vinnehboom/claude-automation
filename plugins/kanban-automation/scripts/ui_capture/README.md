@@ -91,14 +91,14 @@ and cleans up on any failure — even one before `--stop` is ever called.
 It reads seven values from the project's `.claude/ui-capture.json`, under
 a `boot` key. Five are required: `db_credentials_command`, `db_setup_commands`,
 `server_command`, `health_path`, and `run_suffix_env_var`. The other two,
-`build_commands` and `hydrate_files`, can be an empty array — a project
-with no build step or nothing to hydrate leaves them empty rather than
-omitting the key.
+`build_commands` and `hydrate_files`, are optional — a project with no
+build step or nothing to hydrate can either omit the key or set it to an
+empty array; the harness treats both the same.
 
 | Key | What it is |
 |---|---|
 | `build_commands` | An array of shell commands. Run once, in order, before the database step. |
-| `db_credentials_command` | A shell command. Prints one line: `name\|username\|password`, for a PostgreSQL database reachable at `127.0.0.1`. |
+| `db_credentials_command` | A shell command. Must print exactly one line, nothing else on stdout: `name\|username\|password`, for a PostgreSQL database reachable at `127.0.0.1`. Only the last line of its output is read, so a stray line before it (a deprecation warning, for example) does not break the parse. |
 | `db_setup_commands` | An array of shell commands. Run in order, with the run-suffix variable (see below) exported, after the harness drops any database left over from an earlier run of the same ticket. Together they create and seed this run's own database. |
 | `server_command` | A shell command with two placeholders, `{port}` and `{pidfile}`. The harness fills both in. The command must start the server in the background on its own (for example, a `-d` flag) and write its own process ID to the file at `{pidfile}` before it returns. |
 | `health_path` | A path, for example `/up`. The harness polls `<server URL><health_path>` until it answers `200`. |
@@ -110,9 +110,10 @@ a branch or a loop, for example — keeps `boot_command` pointing at its own
 script instead. This harness only runs when a project's `boot_command`
 names this file.
 
-`boot_command` runs inside `run.sh`'s own shell, so `${CLAUDE_PLUGIN_ROOT}`
-in it always resolves there, whether or not the process that started
-`run.sh` set that variable itself.
+`boot_command` runs inside a fresh `sh -c`, not inside `run.sh`'s own
+shell. `run.sh` exports `${CLAUDE_PLUGIN_ROOT}` before invoking it so that
+child shell can resolve the variable too, whether or not the process that
+started `run.sh` set it.
 
 See `boot-config.example.json` for a worked `.claude/ui-capture.json` that
 uses the harness.
@@ -236,3 +237,5 @@ outcome in `exit_code` and `message`.
 - `boot.sh` also needs `node` (it finds a free port with one), `curl` (it
   polls the health path with one), and `dropdb` on the command line,
   against a PostgreSQL server reachable at `127.0.0.1`.
+- `boot.sh` needs bash 4 or newer (`mapfile`) and git 2.31 or newer
+  (`--path-format=absolute`).

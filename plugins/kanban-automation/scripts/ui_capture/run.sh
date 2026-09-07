@@ -39,11 +39,11 @@ BUDGET=600
 PROJECT_DIR=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --ticket) TICKET="$2"; shift 2 ;;
-    --targets) TARGETS_FILE="$2"; shift 2 ;;
-    --out) OUT_DIR="$2"; shift 2 ;;
-    --budget) BUDGET="$2"; shift 2 ;;
-    --project-dir) PROJECT_DIR="$2"; shift 2 ;;
+    --ticket) [ $# -ge 2 ] || usage; TICKET="$2"; shift 2 ;;
+    --targets) [ $# -ge 2 ] || usage; TARGETS_FILE="$2"; shift 2 ;;
+    --out) [ $# -ge 2 ] || usage; OUT_DIR="$2"; shift 2 ;;
+    --budget) [ $# -ge 2 ] || usage; BUDGET="$2"; shift 2 ;;
+    --project-dir) [ $# -ge 2 ] || usage; PROJECT_DIR="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -63,7 +63,7 @@ CAPTURE_MJS="$SCRIPT_DIR/capture.mjs"
 # boot_command runs inside the fresh `sh -c` below, not inside this shell,
 # so a project that writes ${CLAUDE_PLUGIN_ROOT} into boot_command needs
 # that variable in THAT child's environment, not just in this one.
-export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$SCRIPT_DIR")")}"
+export CLAUDE_PLUGIN_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # The working directory decides which checkout gets captured, so it is the
 # default -- NOT $CLAUDE_PROJECT_DIR, which points at the session's own main
