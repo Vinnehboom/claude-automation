@@ -60,6 +60,11 @@ esac
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CAPTURE_MJS="$SCRIPT_DIR/capture.mjs"
 
+# boot_command runs inside the fresh `sh -c` below, not inside this shell,
+# so a project that writes ${CLAUDE_PLUGIN_ROOT} into boot_command needs
+# that variable in THAT child's environment, not just in this one.
+export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$SCRIPT_DIR")")}"
+
 # The working directory decides which checkout gets captured, so it is the
 # default -- NOT $CLAUDE_PROJECT_DIR, which points at the session's own main
 # checkout and would silently capture the wrong branch from a dispatch

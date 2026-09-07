@@ -31,8 +31,17 @@ wall-clock limit in seconds. It defaults to 600.
 
 ```json
 {
-  "boot_command": "script/ui_capture/boot.sh",
+  "boot_command": "${CLAUDE_PLUGIN_ROOT}/scripts/ui_capture/boot.sh",
   "core_targets_command": "script/ui_capture/core_targets.sh",
+  "boot": {
+    "build_commands": ["npm run build", "npm run build:css"],
+    "db_credentials_command": "…",
+    "db_setup_commands": ["…", "…"],
+    "server_command": "… -p {port} -P {pidfile} …",
+    "health_path": "/up",
+    "hydrate_files": ["config/credentials/test.key"],
+    "run_suffix_env_var": "TEST_ENV_NUMBER"
+  },
   "sign_in": {
     "path": "/users/sign_in",
     "email_selector": "#user_email",
@@ -64,6 +73,56 @@ environment.
 
 The `--stop` form tears the same run down. `run.sh` calls it on every exit
 path, a budget timeout and a kill included.
+
+A project can write its own `boot_command` script, or point it at
+`boot.sh` below, the harness this plugin ships.
+
+### `boot.sh`, the generic boot harness
+
+Point `boot_command` at `${CLAUDE_PLUGIN_ROOT}/scripts/ui_capture/boot.sh`
+to use this harness instead of a project-owned script. It does the part of
+booting an app that has nothing to do with the app's own framework: finds
+a free port, starts the server, waits for a pidfile, polls a health path,
+retries three times if the port turns out taken, hydrates a dispatch
+worktree from the main checkout, drops and recreates a per-run database
+named by a suffix, writes a state file, tears the run down from it later,
+and cleans up on any failure — even one before `--stop` is ever called.
+
+It reads seven values from the project's `.claude/ui-capture.json`, under
+a `boot` key. Five are required: `db_credentials_command`, `db_setup_commands`,
+`server_command`, `health_path`, and `run_suffix_env_var`. The other two,
+`build_commands` and `hydrate_files`, can be an empty array — a project
+with no build step or nothing to hydrate leaves them empty rather than
+omitting the key.
+
+| Key | What it is |
+|---|---|
+| `build_commands` | An array of shell commands. Run once, in order, before the database step. |
+| `db_credentials_command` | A shell command. Prints one line: `name\|username\|password`, for a PostgreSQL database reachable at `127.0.0.1`. |
+| `db_setup_commands` | An array of shell commands. Run in order, with the run-suffix variable (see below) exported, after the harness drops any database left over from an earlier run of the same ticket. Together they create and seed this run's own database. |
+| `server_command` | A shell command with two placeholders, `{port}` and `{pidfile}`. The harness fills both in. The command must start the server in the background on its own (for example, a `-d` flag) and write its own process ID to the file at `{pidfile}` before it returns. |
+| `health_path` | A path, for example `/up`. The harness polls `<server URL><health_path>` until it answers `200`. |
+| `hydrate_files` | An array of paths, relative to the project root, that a dispatch worktree may lack. The harness copies each one from the main checkout when the worktree does not already have it. `node_modules` is not on this list — the harness always symlinks it from the main checkout on its own, since every project on this driver already needs Node for `capture.mjs`. |
+| `run_suffix_env_var` | The name of the environment variable that carries the run's database suffix, for example `TEST_ENV_NUMBER`. The harness exports it, under this name, before `db_setup_commands` and before `server_command`, and again as the second line of its own stdout on success. |
+
+A project whose boot procedure does not fit this shape — a boot that needs
+a branch or a loop, for example — keeps `boot_command` pointing at its own
+script instead. This harness only runs when a project's `boot_command`
+names this file.
+
+`boot_command` runs inside `run.sh`'s own shell, so `${CLAUDE_PLUGIN_ROOT}`
+in it always resolves there, whether or not the process that started
+`run.sh` set that variable itself.
+
+See `boot-config.example.json` for a worked `.claude/ui-capture.json` that
+uses the harness.
+
+The database step assumes PostgreSQL: the harness drops the run's database
+with `dropdb` on the command line, reading the connection details from
+`db_credentials_command`, both before `db_setup_commands` runs and again
+on teardown. Creating and seeding the database is `db_setup_commands`'s own
+job, not the harness's. A project on a different database engine needs its
+own `boot_command` script instead.
 
 ### `core_targets_command`
 
@@ -154,8 +213,13 @@ failure, whatever else is true about the entry.
   --project-dir <path>` — the Playwright driver. Writes
   `<out>/manifest.json` after every entry, so a budget timeout or a crash
   mid-run still leaves everything captured so far on disk.
+- `boot.sh --ticket <id> [--dir <path>] [--stop]` — the generic boot
+  harness described above. A project opts in by pointing its own
+  `boot_command` at this file.
 - `example.json` — a worked example of the Capture plan shape, for the
   planner and the developer to copy from.
+- `boot-config.example.json` — a worked `.claude/ui-capture.json` that uses
+  the harness, for a project adopting it to copy from.
 
 On exit, `<out>/result.json` lists every captured target and the overall
 outcome in `exit_code` and `message`.
@@ -169,3 +233,6 @@ outcome in `exit_code` and `message`.
   ES module loader does not consult `NODE_PATH` on its own. `capture.mjs`
   reaches it through `createRequire`, which does.
 - `jq` is required.
+- `boot.sh` also needs `node` (it finds a free port with one), `curl` (it
+  polls the health path with one), and `dropdb` on the command line,
+  against a PostgreSQL server reachable at `127.0.0.1`.
