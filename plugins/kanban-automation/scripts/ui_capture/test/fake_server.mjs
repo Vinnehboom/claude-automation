@@ -50,10 +50,14 @@ if (mode === 'listen') {
     process.exit(1);
   }
 
+  // --pidfile is passed through even though listen mode ignores it: it
+  // gives run_tests.sh a stable, per-run string to find this specific
+  // child with (pgrep -f), including on the never-pidfile path where
+  // the file itself is never written.
   const child = spawn(
     process.execPath,
     [self, '--mode', 'listen', '--port', String(port), '--health-path', healthPath,
-     '--delay', String(delay), '--die-after', String(dieAfter)],
+     '--delay', String(delay), '--die-after', String(dieAfter), '--pidfile', pidfile],
     { detached: true, stdio: 'ignore' },
   );
   child.unref();

@@ -120,10 +120,16 @@ write_result() {
   ' > "$OUT_DIR/result.json"
 }
 
+# BOOTED only flips true once boot_command itself has exited 0 below, so
+# cleanup never tears down a run it didn't start -- a boot that failed
+# (a double-boot refusal included) has nothing here to stop, and must
+# not reach for whatever --dir's state file actually belongs to.
 CLEANED_UP=false
+BOOTED=false
 cleanup() {
   [ "$CLEANED_UP" = true ] && return
   CLEANED_UP=true
+  [ "$BOOTED" = true ] || return
   log "tearing down"
   sh -c "$BOOT_COMMAND --ticket \"\$1\" --dir \"\$2\" --stop" sh "$TICKET" "$OUT_DIR" >/dev/null 2>&1 || true
 }
@@ -145,6 +151,7 @@ if ! sh -c "$BOOT_COMMAND --ticket \"\$1\" --dir \"\$2\"" sh "$TICKET" "$OUT_DIR
   write_result 2 "boot failure"
   exit 2
 fi
+BOOTED=true
 
 BASE_URL=""
 while IFS= read -r line; do
