@@ -546,6 +546,24 @@ a background `Agent` subagent of THIS session, with `isolation:
   cycle boundaries — treat it as immediate triage work, not something to
   fold into the end-of-cycle rundown the way an actual human-facing
   checkpoint question is.
+- **Re-check `cost_usd` after a Reviewer hand-back and after a completed
+  Gatekeeper phase, not only at the top of a scheduled cycle.** Step 0's
+  ceiling check only runs once, before this cycle starts — a cycle that
+  goes on to dispatch a Reviewer round and then run the Gatekeeper phase
+  for the same ticket (or for several, back to back) can cross
+  `orchestrator_cost_ceiling_usd` well inside that single unattended
+  stretch, with nothing watching until the next scheduled firing. Generation
+  11 predicted this; generation 12 hit it exactly (`cost_usd` was $45.96
+  shortly before a Reviewer dispatch plus its follow-on Gatekeeper phase,
+  then $64.41 against a $50 ceiling by the time a manual check caught it,
+  with no scheduled `/kanban-cycle` boundary in between). So: after
+  relaying a Reviewer hand-back's result back to its dispatched agent, and
+  again after a Gatekeeper phase finishes (a PR reaches ready-for-review or
+  merges), call `get_session` the same way step 0 does. If `cost_usd`
+  already exceeds the ceiling, run `/handoff` immediately instead of
+  waiting for the next scheduled firing to notice — the whole point of
+  catching this mid-stretch is not to let it sit past the ceiling for
+  hours.
 
 **Classifier blocks plain `git rebase` inside a dispatched agent, not just
 history-rewriting flags.** The earlier-known classifier block was for
