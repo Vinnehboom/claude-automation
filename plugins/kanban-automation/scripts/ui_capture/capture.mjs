@@ -11,10 +11,14 @@
 //
 // The targets file is the merged JSON described in the ticket-pipeline
 // skill's references/developer.md (Step 5): a `ticket` id and a `targets`
-// array. Each target carries `name`, `kind` ("still"),
-// `path`, and optionally `signed_out: true`. A target may also carry
-// `source: "core"` (set by run.sh when it merges in UiCapture::CoreTargets'
-// output); anything else is treated as ticket-sourced.
+// array. Each target carries `name`, `kind` ("still" or "video"), `path`,
+// and optionally `signed_out: true`. A "video" target also carries
+// `steps`, a list of `{action, selector, value}` entries; `action` is one
+// of `click`, `fill`, `wait_for`, `press` (`value` applies to `fill` and
+// `press` only). A target may also carry `source: "core"` (set by run.sh
+// when it merges in UiCapture::CoreTargets' output); anything else is
+// treated as ticket-sourced. The core surface never carries a video
+// target.
 //
 // Writes `<out>/manifest.json` after every entry, so a budget timeout or a
 // crash mid-run still leaves everything captured so far on disk: an array
@@ -23,8 +27,9 @@
 // "contact-sheet" record per viewport when one was built. `attach` says
 // whether the Gatekeeper should send this file on its own: false for a
 // core still folded into its viewport's contact sheet, true for the sheet
-// itself, a ticket target, a core page that did not answer 200, or any
-// entry that failed outright (as long as it produced a file at all).
+// itself, a ticket target (still or video), a core page that did not
+// answer 200, or any entry that failed outright (as long as it produced a
+// file at all).
 //
 // `status` is either the real numeric HTTP status or null; null (paired
 // with a non-empty `error`) always means a tooling failure, never a page
@@ -194,9 +199,63 @@ async function captureStill(page, target, baseUrl, outDir, viewportName, signInP
 
 function skippedEntry(target, viewportName, reason) {
   return finalizeEntry({
-    name: target.name, kind: 'still', viewport: viewportName, source: targetSource(target),
-    file: null, bytes: 0, status: null, error: reason,
+    name: target.name, kind: target.kind === 'video' ? 'video' : 'still', viewport: viewportName,
+    source: targetSource(target), file: null, bytes: 0, status: null, error: reason,
   });
+}
+
+// The four-key step vocabulary a video target's `steps` array is limited
+// to -- see the file header. A target list reaches this file as data, not
+// code, so it can carry a selector and a value but never arbitrary
+// JavaScript.
+async function runStep(page, step) {
+  switch (step.action) {
+    case 'click':
+      await page.click(step.selector);
+      return;
+    case 'fill':
+      await page.fill(step.selector, step.value);
+      return;
+    case 'wait_for':
+      await page.waitForSelector(step.selector);
+      return;
+    case 'press':
+      await page.press(step.selector, step.value);
+      return;
+    default:
+      throw new Error(`unknown step action: ${JSON.stringify(step.action)}`);
+  }
+}
+
+async function captureVideo(browser, target, baseUrl, credentials, signInConfig, outDir, viewportName, viewportConfig) {
+  const base = { name: target.name, kind: 'video', viewport: viewportName, source: targetSource(target) };
+  const videoDir = path.join(outDir, viewportName, `${target.name}-video-tmp`);
+  fs.mkdirSync(videoDir, { recursive: true });
+
+  // A video target gets its own context, one per viewport -- the video
+  // size follows the context's viewport, and context.close() is what
+  // completes the file (see the file header).
+  const context = await browser.newContext({ ...viewportConfig, baseURL: baseUrl, recordVideo: { dir: videoDir } });
+  try {
+    const page = await context.newPage();
+    if (!target.signed_out) await signIn(page, baseUrl, credentials, signInConfig);
+    await page.goto(new URL(target.path, baseUrl).toString(), { waitUntil: 'networkidle' });
+    for (const step of target.steps || []) await runStep(page, step);
+
+    const video = page.video();
+    await context.close();
+    const tmpPath = video ? await video.path() : null;
+    if (!tmpPath) throw new Error('no video was recorded for this context');
+
+    const filePath = path.join(outDir, viewportName, `${target.name}.webm`);
+    fs.renameSync(tmpPath, filePath);
+    fs.rmSync(videoDir, { recursive: true, force: true });
+    return finalizeEntry({ ...base, file: filePath, bytes: fs.statSync(filePath).size, status: 200 });
+  } catch (error) {
+    await context.close().catch(() => {});
+    fs.rmSync(videoDir, { recursive: true, force: true });
+    return finalizeEntry({ ...base, file: null, bytes: 0, status: null, error: error.message });
+  }
 }
 
 function escapeHtml(value) {
@@ -265,8 +324,11 @@ async function captureViewport(browser, targets, baseUrl, credentials, signInCon
     writeManifest(outDir, manifest);
   };
 
-  const signedOutTargets = targets.filter((t) => t.signed_out);
-  const restTargets = targets.filter((t) => !t.signed_out);
+  const stillTargets = targets.filter((t) => t.kind !== 'video');
+  const videoTargets = targets.filter((t) => t.kind === 'video');
+
+  const signedOutTargets = stillTargets.filter((t) => t.signed_out);
+  const restTargets = stillTargets.filter((t) => !t.signed_out);
 
   const context = await browser.newContext({ ...viewportConfig, baseURL: baseUrl });
   const page = await context.newPage();
@@ -291,6 +353,13 @@ async function captureViewport(browser, targets, baseUrl, credentials, signInCon
   }
 
   await context.close();
+
+  // Each video target opens and closes its own context (see
+  // captureVideo), so it runs after the shared stills context above is
+  // done with rather than alongside it.
+  for (const target of videoTargets) {
+    push(await captureVideo(browser, target, baseUrl, credentials, signInConfig, outDir, viewportName, viewportConfig));
+  }
 
   const sheet = await buildContactSheet(browser, manifest.filter((e) => e.viewport === viewportName), outDir, viewportName);
   if (sheet) push(sheet);
