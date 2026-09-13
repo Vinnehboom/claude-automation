@@ -33,7 +33,7 @@ For each commit: write the failing spec, minimum code to pass, refactor green, k
 After implementation, look again for paths the plan's specs don't exercise. Add genuinely-missing specs. Don't pad with tests that assert nothing.
 
 ## Step 5 — Amend the Capture plan (standing instruction, 2026-09-06)
-Re-read the plan's `## Capture plan` section against what you actually built. The planner wrote it from the ticket alone, before any of this code existed — a target's `path` may not match the real route once the code landed. Fix any target that doesn't match reality. A target is a page to capture, nothing more (video capture is deferred to a later ticket — see references/planner.md's Step 2.7).
+Re-read the plan's `## Capture plan` section against what you actually built. The planner wrote it from the ticket alone, before any of this code existed — a target's `path` may not match the real route once the code landed, and a `steps` selector on a video target may not match the real markup either. Fix any target that doesn't match reality. A target is a page to capture, or a flow to record — see references/planner.md's Step 2.7 for the shape of each.
 
 Hand back the final list as JSON, in the plugin's `scripts/ui_capture/example.json` shape. The orchestrator writes this, verbatim, to `tmp/ui-capture/<TASK_ID>.json` for the Gatekeeper to run (see SKILL.md Phase 5, step 1b). An empty `targets: []` list is fine when this ticket adds nothing beyond what the automatic core capture already reaches.
 
