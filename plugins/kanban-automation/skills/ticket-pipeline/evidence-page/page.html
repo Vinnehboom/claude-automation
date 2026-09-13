@@ -108,12 +108,8 @@
     document.getElementById("meta").innerHTML = meta && meta.repo ? esc(meta.repo) : "";
   }
 
-  function isVideoPath(p) {
-    return /\.webm$/i.test(String(p || ""));
-  }
-
   function fileEntry(f) {
-    var media = isVideoPath(f.path)
+    var media = f.kind === "video"
       ? "<video src=\"" + esc(f.path) + "\" controls preload=\"metadata\"></video>"
       : "<a href=\"" + esc(f.path) + "\" target=\"_blank\" rel=\"noopener\"><img src=\"" + esc(f.path) + "\" loading=\"lazy\" alt=\"" + esc(f.name) + "\"></a>";
     var statusChip = f.status != null ? " " + chip(String(f.status), f.status === 200 ? "good" : "bad") : "";
