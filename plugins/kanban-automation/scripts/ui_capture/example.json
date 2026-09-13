@@ -1,6 +1,10 @@
 {
   "ticket": "H-8",
   "targets": [
-    { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" }
+    { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" },
+    { "name": "create-score-modifier", "kind": "video", "path": "/admin/score_modifiers/new", "steps": [
+      { "action": "fill", "selector": "#score_modifier_value", "value": "5" },
+      { "action": "click", "selector": "input[type=\"submit\"]" }
+    ] }
   ]
 }

@@ -1,0 +1,198 @@
+<title>PR evidence — {{TICKET}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#F3F5F7; --surface:#FFFFFF; --surface-2:#E9EDF2;
+    --ink:#141D29; --ink-2:#3D4A5C; --muted:#69788C;
+    --rule:#D8DEE7; --rule-strong:#B7C2D0;
+    --accent:#1B4C86; --accent-soft:#E3ECF7;
+    --attention:#8F4D00; --attention-soft:#FAEDDA; --attention-edge:#D98A2B;
+    --good:#1B7A4E; --good-soft:#DFEFE7;
+    --bad:#AC2A20; --bad-soft:#F9E5E2;
+    --sans:"Archivo","Helvetica Neue",Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+    --pad:clamp(14px,2.4vw,26px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0C131C; --surface:#141E2B; --surface-2:#1C2836;
+      --ink:#E7ECF3; --ink-2:#BAC6D5; --muted:#8595A9;
+      --rule:#243141; --rule-strong:#3A4B5E;
+      --accent:#7FB0E8; --accent-soft:#16283C;
+      --attention:#EDA845; --attention-soft:#31220F; --attention-edge:#B8792A;
+      --good:#54C48D; --good-soft:#0F2C21;
+      --bad:#F0776A; --bad-soft:#331815;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0C131C; --surface:#141E2B; --surface-2:#1C2836;
+    --ink:#E7ECF3; --ink-2:#BAC6D5; --muted:#8595A9;
+    --rule:#243141; --rule-strong:#3A4B5E;
+    --accent:#7FB0E8; --accent-soft:#16283C;
+    --attention:#EDA845; --attention-soft:#31220F; --attention-edge:#B8792A;
+    --good:#54C48D; --good-soft:#0F2C21;
+    --bad:#F0776A; --bad-soft:#331815;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground); color:var(--ink); font-family:var(--sans); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased}
+  a{color:var(--accent)}
+  video{max-width:100%; display:block; background:#000}
+  .wrap{max-width:920px; margin:0 auto; padding:clamp(20px,4vw,44px) var(--pad) 72px}
+  .masthead{border-bottom:2px solid var(--ink); padding-bottom:14px}
+  .eyebrow{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  h1{font-size:clamp(1.5rem,3vw,2rem); font-weight:700; letter-spacing:-.02em; margin:.18em 0 0}
+  .meta{font-family:var(--mono); font-size:12.5px; color:var(--muted); margin-top:8px; overflow-wrap:anywhere}
+  .empty{margin-top:24px; font-size:14px; color:var(--muted); padding:14px 16px; border:1px dashed var(--rule-strong); background:var(--surface)}
+  .chip{font-family:var(--mono); font-size:10.5px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; padding:2px 7px; white-space:nowrap; border:1px solid var(--rule-strong); color:var(--muted); background:var(--surface); display:inline-block}
+  .chip.good{color:var(--good); border-color:var(--good); background:var(--good-soft)}
+  .chip.bad{color:var(--bad); border-color:var(--bad); background:var(--bad-soft)}
+  .chip.warn{color:var(--attention); border-color:var(--attention-edge); background:var(--attention-soft)}
+  .round{margin-top:28px; border:1px solid var(--rule); background:var(--surface); padding:16px}
+  .round-head{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:6px}
+  .round-num{font-family:var(--mono); font-size:13px; font-weight:600}
+  .stamp{font-family:var(--mono); font-size:12px; color:var(--muted)}
+  .round-meta{font-family:var(--mono); font-size:12.5px; color:var(--ink-2); display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px}
+  .mono{font-family:var(--mono)}
+  .findings-block{margin:10px 0; padding:10px 12px; border-left:3px solid var(--rule-strong); background:var(--surface-2)}
+  .findings-block h4{margin:0 0 4px; font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2)}
+  .findings-block h4 ~ h4{margin-top:10px}
+  .findings{margin:0; padding-left:18px}
+  .findings li{font-size:13.5px; margin-bottom:3px}
+  .files{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-top:12px}
+  figure{margin:0; border:1px solid var(--rule); background:var(--surface-2)}
+  figure img{width:100%; display:block}
+  figcaption{padding:6px 8px; font-family:var(--mono); font-size:11px; color:var(--muted); overflow-wrap:anywhere}
+  footer{margin-top:40px; padding-top:14px; border-top:1px solid var(--rule); font-size:13px; color:var(--muted); max-width:70ch}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow" id="ticket-line">Ticket</div>
+    <h1>PR evidence</h1>
+    <div class="meta" id="meta"></div>
+  </header>
+  <section id="rounds"></section>
+  <div class="empty" id="empty" hidden></div>
+  <footer>
+    <p>Each round below is one Gatekeeper run for this ticket: a capture, and — once a review round finishes — the reviewer's top findings. Nothing on this page is ever deleted. This page stays after the pull request merges.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function stamp(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return esc(iso || "—");
+    return d.toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+  function chip(text, tone) {
+    return '<span class="chip' + (tone ? " " + esc(tone) : "") + '">' + esc(text) + "</span>";
+  }
+  var OUTCOME_TONE = { clean: "good", tooling_failure: "warn", blocked: "bad" };
+  var OUTCOME_LABEL = { clean: "clean capture", tooling_failure: "tooling failure", blocked: "blocked — a page failed" };
+  var CI_TONE = { success: "good", failure: "bad", error: "bad" };
+
+  function renderMeta(meta) {
+    var ticket = (meta && meta.ticket) || "";
+    document.getElementById("ticket-line").textContent = ticket || "Ticket";
+    if (ticket) document.title = "PR evidence — " + ticket;
+    document.getElementById("meta").innerHTML = meta && meta.repo ? esc(meta.repo) : "";
+  }
+
+  function fileEntry(f) {
+    var media = f.kind === "video"
+      ? "<video src=\"" + esc(f.path) + "\" controls preload=\"metadata\"></video>"
+      : "<a href=\"" + esc(f.path) + "\" target=\"_blank\" rel=\"noopener\"><img src=\"" + esc(f.path) + "\" loading=\"lazy\" alt=\"" + esc(f.name) + "\"></a>";
+    var statusChip = f.status != null ? " " + chip(String(f.status), f.status === 200 ? "good" : "bad") : "";
+    return "<figure>" + media + "<figcaption>" + esc(f.name) + " · " + esc(f.viewport || "") + statusChip + "</figcaption></figure>";
+  }
+
+  function findingsList(items) {
+    return "<ul class=\"findings\">" + items.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>";
+  }
+
+  function findingsBlock(findings) {
+    if (!findings) return "";
+    var blocking = findings.blocking || [];
+    var nonBlocking = findings.non_blocking || [];
+    if (!blocking.length && !nonBlocking.length) return "";
+    var html = "<div class=\"findings-block\">";
+    if (blocking.length) html += "<h4>Blocking</h4>" + findingsList(blocking);
+    if (nonBlocking.length) html += "<h4>Non-blocking</h4>" + findingsList(nonBlocking);
+    return html + "</div>";
+  }
+
+  function renderRound(r) {
+    var files = (r.files || []).map(fileEntry).join("");
+    var metaBits = [];
+    if (r.pr && r.pr.url) metaBits.push("<a href=\"" + esc(r.pr.url) + "\" target=\"_blank\" rel=\"noopener\">PR #" + esc(r.pr.number) + "</a>");
+    if (r.branch) metaBits.push("<span class=\"mono\">" + esc(r.branch) + "</span>");
+    if (r.commit) metaBits.push("<span class=\"mono\">" + esc(String(r.commit).slice(0, 12)) + "</span>");
+    if (r.ci_state) metaBits.push(chip(r.ci_state, CI_TONE[r.ci_state] || ""));
+    return "<article class=\"round\">" +
+      "<div class=\"round-head\"><span class=\"round-num\">Round " + esc(r.round) + "</span>" +
+      "<span class=\"stamp\">" + stamp(r.at) + "</span>" +
+      chip(OUTCOME_LABEL[r.outcome] || r.outcome || "", OUTCOME_TONE[r.outcome] || "") +
+      "</div>" +
+      "<div class=\"round-meta\">" + metaBits.join(" ") + "</div>" +
+      findingsBlock(r.findings) +
+      (files ? "<div class=\"files\">" + files + "</div>" : "") +
+      "</article>";
+  }
+
+  function renderRounds(list) {
+    var el = document.getElementById("rounds");
+    var empty = document.getElementById("empty");
+    if (!list.length) {
+      el.innerHTML = "";
+      empty.hidden = false;
+      empty.textContent = "No round has been captured yet.";
+      return;
+    }
+    empty.hidden = true;
+    el.innerHTML = list.map(renderRound).join("");
+  }
+
+  function showUnavailable(text) {
+    var empty = document.getElementById("empty");
+    empty.hidden = false;
+    empty.textContent = text;
+  }
+
+  async function main() {
+    var db = null;
+    try {
+      db = await window.claude.use("db");
+    } catch (e) {
+      db = null;
+    }
+    if (!db) {
+      showUnavailable("This page cannot reach its store right now. Reload, or check back shortly.");
+      return;
+    }
+    try {
+      var metaSnap = await db.doc("meta/info").get();
+      renderMeta(metaSnap.exists ? metaSnap.data() : null);
+    } catch (e) {
+      // The header still renders without it; a round's own PR link carries the same facts.
+    }
+    try {
+      var snap = await db.collection("rounds").orderBy("round", "asc").get();
+      renderRounds(snap.docs.map(function (d) { return d.data(); }));
+    } catch (e) {
+      showUnavailable("Could not load this ticket's rounds.");
+    }
+  }
+
+  main();
+})();
+</script>

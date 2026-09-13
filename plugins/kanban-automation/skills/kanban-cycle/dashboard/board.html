@@ -350,6 +350,11 @@
   </section>
 
   <section>
+    <div class="head"><h2>Evidence pages</h2><span class="count" id="evidence-count"></span></div>
+    <div id="evidence"></div>
+  </section>
+
+  <section>
     <div class="head"><h2>In flight</h2><span class="count" id="dispatch-count"></span></div>
     <div id="dispatches"></div>
   </section>
@@ -410,6 +415,7 @@
     caps: { open_prs: 1, max_open_prs: 2, stacked_prs: 0, max_stacked_prs: 2 },
     needs_you: [],
     prs: [],
+    evidence: [],
     dispatches: [],
     board: { totals: {}, epics: [], next_up: [] },
     agents: null,
@@ -651,10 +657,29 @@
       return '<div class="row ' + esc(r.state || "") + '"><div class="row-main"><div class="row-id">' +
         projChip(x.p) + link(r.url, "#" + r.number) +
         (r.ticket ? '<span class="sep">·</span>' + link(r.ticket_url, r.ticket) : "") +
+        (r.evidence_url ? '<span class="sep">·</span>' + link(r.evidence_url, "Evidence") : "") +
         (r.waiting_since ? ageTag(r.waiting_since) : "") +
         '</div><div class="row-title">' + esc(r.title || "") + "</div>" +
         (r.note ? '<div class="row-note">' + esc(r.note) + "</div>" : "") +
         '</div><div class="row-side">' + chips(r.chips) + "</div></div>";
+    }).join("") + "</div>";
+  }
+
+  function renderEvidence() {
+    var rows = [];
+    visible().forEach(function (p) { (p.evidence || []).forEach(function (e) { rows.push({ e: e, p: p }); }); });
+    rows.sort(function (a, b) { return new Date(b.e.at || 0) - new Date(a.e.at || 0); });
+    $("evidence-count").textContent = rows.length ? rows.length : "";
+    if (!rows.length) {
+      $("evidence").innerHTML = '<div class="empty">No ticket has an evidence page yet.</div>';
+      return;
+    }
+    $("evidence").innerHTML = '<div class="rows">' + rows.map(function (x) {
+      var e = x.e;
+      return '<div class="row"><div class="row-main"><div class="row-id">' +
+        projChip(x.p) + link(e.ticket_url, e.ticket) +
+        '</div><div class="row-title">' + link(e.url, "Evidence page") + "</div>" +
+        '</div><div class="row-side">' + (e.at ? ageTag(e.at) : "") + "</div></div>";
     }).join("") + "</div>";
   }
 
@@ -920,7 +945,7 @@
   /* ---------- paint ---------- */
   function paint() {
     renderTabs(); renderStrip(); renderAsks(); renderCompose();
-    renderPrs(); renderDispatches(); renderBoard();
+    renderPrs(); renderEvidence(); renderDispatches(); renderBoard();
     renderThroughput(); renderAgents(); renderKnowledge(); renderLog();
   }
 

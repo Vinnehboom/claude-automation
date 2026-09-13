@@ -163,11 +163,19 @@ instead of rendering records as a tooling failure (`status: null`, with an
 ```json
 { "ticket": "H-8",
   "targets": [
-    { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" } ] }
+    { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" },
+    { "name": "create-score-modifier", "kind": "video", "path": "/admin/score_modifiers/new",
+      "steps": [{ "action": "fill", "selector": "#score_modifier_value", "value": "5" },
+                { "action": "click", "selector": "input[type=\"submit\"]" }] } ] }
 ```
 
-A target is a page, nothing more: a `name`, `kind` (currently always
-`"still"`), a `path`, and optionally `signed_out: true`.
+A `still` target is a page, nothing more: a `name`, `kind`, a `path`, and
+optionally `signed_out: true`. A `video` target adds `steps`: an ordered
+list of `{action, selector, value}` entries, `action` one of `click`,
+`fill`, `wait_for`, `press` (`value` applies to `fill` and `press` only).
+Each video gets its own browser context, at each viewport, and completes
+when that context closes — one WebM file per viewport, VP8 at 25 frames
+per second.
 
 ## Contact sheets
 
@@ -184,8 +192,10 @@ Everything else is marked `"attach": true` and gets its own full-size file:
   (`status: null` with an `error`).
 - Each contact sheet itself.
 
-An entry with no `file` is always `"attach": false`. The Gatekeeper sends
-every entry whose `attach` is true and whose `file` is not null.
+An entry with no `file` is always `"attach": false`. The Gatekeeper
+publishes every entry whose `attach` is true and whose `file` is not
+null to the ticket's evidence page (see the `ticket-pipeline` skill's
+`evidence-page/README.md`).
 
 ## Exit codes
 
@@ -221,6 +231,11 @@ failure, whatever else is true about the entry.
   planner and the developer to copy from.
 - `boot-config.example.json` — a worked `.claude/ui-capture.json` that uses
   the harness, for a project adopting it to copy from.
+- `test/run_tests.sh` — the boot/run suite described above.
+- `test/capture_logic_test.mjs` — a `node --test` suite for `capture.mjs`'s
+  pure logic (the step dispatch, the attach rule, the sign-in-bounce
+  check). Nothing that drives a real browser is covered here. Run it with
+  `NODE_PATH="$(npm root -g)" node --test scripts/ui_capture/test/capture_logic_test.mjs`.
 
 On exit, `<out>/result.json` lists every captured target and the overall
 outcome in `exit_code` and `message`.

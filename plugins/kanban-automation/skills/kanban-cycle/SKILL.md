@@ -683,13 +683,33 @@ whole picture every time, never a diff):
   waits on him; the page renders "All clear", which is a good state, not
   a gap to fill.
 - `prs` — one per open PR: `{number, ticket, ticket_url, title, url,
-  state, chips, note, waiting_since}`. `state` drives the row stripe:
-  `ok` (healthy or merge-ready), `flag` (needs work this cycle), `err`
-  (CI red or conflicted), `idle` (nothing to do, or another session owns
-  it). `waiting_since` is when it entered its current state, so the
-  board can age it. `note` is one or two plain sentences saying **what
-  happens next**, which is the question Vinnie is really asking.
+  state, chips, note, waiting_since, evidence_url}`. `state` drives the
+  row stripe: `ok` (healthy or merge-ready), `flag` (needs work this
+  cycle), `err` (CI red or conflicted), `idle` (nothing to do, or another
+  session owns it). `waiting_since` is when it entered its current state,
+  so the board can age it. `note` is one or two plain sentences saying
+  **what happens next**, which is the question Vinnie is really asking.
   `chips` is `{text, tone}` with tone `good`/`bad`/`warn`/`info`/`""`.
+  `evidence_url` is optional: when the ticket's Notion card carries a
+  `## Visual evidence` section whose first line reads `Evidence page:
+  <url>` (`ticket-pipeline`'s Gatekeeper writes this line — see its
+  SKILL.md Phase 5, step 1b), read that URL in and the board links to it
+  next to the ticket. Leave it unset when the card has no such line —
+  most tickets never touch application code, so most rows have none. Also
+  fold it into `evidence` below — this field disappears with the row once
+  the PR merges, and the page itself does not.
+- `evidence` — every ticket that has ever had an evidence page, kept
+  whether or not its pull request is still open: `{ticket, ticket_url,
+  url, at}`. **This array only grows.** Read the current `state/<project_key>`
+  document first (`read_db`, `db_op: "get"`) and carry every entry it
+  already holds forward into this cycle's full replace, the same pattern
+  `agents.recent` already uses — recomputing it from this cycle's open
+  PRs alone would drop every ticket whose PR has since merged, which
+  defeats the reason this list exists: the ticket's Goal is a page
+  findable without the pull request, and Checkpoint 1 said the page
+  itself stays permanently, so the board's own record of it must too.
+  Add or update an entry (`at` is this cycle's time) for every open PR
+  above that has an `evidence_url`; never remove one.
 - `dispatches` — one per agent `ListAgents` shows active: `{ticket,
   ticket_url, pr, pr_url, task, phase, note, started, state}`. A
   dispatch you know to be orphaned (the vanished-worktree case under
