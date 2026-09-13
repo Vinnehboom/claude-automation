@@ -14,13 +14,19 @@ artifact's own document store and shows them:
 - `meta/info` — one document: `{ticket, repo}`. Cosmetic only (the page
   header and the browser tab title); its absence does not stop the page
   from showing rounds.
-- `rounds` — one document per Gatekeeper run for this ticket, id `"1"`,
-  `"2"`, and so on. Read in order by the `round` field. See "Round shape"
-  below.
+- `rounds` — one document per Gatekeeper run for this ticket, doc id
+  `"1"`, `"2"`, and so on (a document id is always a string). Read in
+  order by the document's own `round` field, which is written as a JSON
+  **number**, never a numeric string — an id-versus-field mix-up here
+  would sort round 10 before round 2. See "Round shape" below.
 
 The page never deletes a round and never edits an old one. A capture
 failure, a review round, and the pull request merging all show up as new
-history, not as a change to what came before.
+history, not as a change to what came before. The Gatekeeper is the only
+writer, and it finds the next round number with `read_db`/`list` on this
+collection before it writes anything — never by reading this page's own
+HTML (the HTML carries no round data; it is the template, read fresh at
+publish time) and never from memory of an earlier turn.
 
 ## Round shape
 
