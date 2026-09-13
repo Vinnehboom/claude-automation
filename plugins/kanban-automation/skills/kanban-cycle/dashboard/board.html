@@ -651,6 +651,7 @@
       return '<div class="row ' + esc(r.state || "") + '"><div class="row-main"><div class="row-id">' +
         projChip(x.p) + link(r.url, "#" + r.number) +
         (r.ticket ? '<span class="sep">·</span>' + link(r.ticket_url, r.ticket) : "") +
+        (r.evidence_url ? '<span class="sep">·</span>' + link(r.evidence_url, "Evidence") : "") +
         (r.waiting_since ? ageTag(r.waiting_since) : "") +
         '</div><div class="row-title">' + esc(r.title || "") + "</div>" +
         (r.note ? '<div class="row-note">' + esc(r.note) + "</div>" : "") +
