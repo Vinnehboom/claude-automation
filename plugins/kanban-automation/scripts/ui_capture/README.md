@@ -164,8 +164,9 @@ instead of rendering records as a tooling failure (`status: null`, with an
 { "ticket": "H-8",
   "targets": [
     { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" },
-    { "name": "attach-score-modifier", "kind": "video", "path": "/admin/score_modifiers/new",
-      "steps": [{ "action": "fill", "selector": "#score_modifier_name", "value": "Playoff bonus" }] } ] }
+    { "name": "create-score-modifier", "kind": "video", "path": "/admin/score_modifiers/new",
+      "steps": [{ "action": "fill", "selector": "#score_modifier_value", "value": "5" },
+                { "action": "click", "selector": "input[type=\"submit\"]" }] } ] }
 ```
 
 A `still` target is a page, nothing more: a `name`, `kind`, a `path`, and
@@ -230,6 +231,11 @@ failure, whatever else is true about the entry.
   planner and the developer to copy from.
 - `boot-config.example.json` — a worked `.claude/ui-capture.json` that uses
   the harness, for a project adopting it to copy from.
+- `test/run_tests.sh` — the boot/run suite described above.
+- `test/capture_logic_test.mjs` — a `node --test` suite for `capture.mjs`'s
+  pure logic (the step dispatch, the attach rule, the sign-in-bounce
+  check). Nothing that drives a real browser is covered here. Run it with
+  `NODE_PATH="$(npm root -g)" node --test scripts/ui_capture/test/capture_logic_test.mjs`.
 
 On exit, `<out>/result.json` lists every captured target and the overall
 outcome in `exit_code` and `message`.

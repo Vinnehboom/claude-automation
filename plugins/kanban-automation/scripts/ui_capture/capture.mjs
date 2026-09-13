@@ -20,6 +20,10 @@
 // treated as ticket-sourced. The core surface never carries a video
 // target.
 //
+// A video records the desktop viewport only, never mobile -- doubling
+// it would double the bytes against the same per-file and per-version
+// size caps the images already publish under.
+//
 // Writes `<out>/manifest.json` after every entry, so a budget timeout or a
 // crash mid-run still leaves everything captured so far on disk: an array
 // of { name, kind, viewport, source, file, bytes, status, attach } records
@@ -199,15 +203,13 @@ async function captureStill(page, target, baseUrl, outDir, viewportName, signInP
 
 function skippedEntry(target, viewportName, reason) {
   return finalizeEntry({
-    name: target.name, kind: target.kind === 'video' ? 'video' : 'still', viewport: viewportName,
+    name: target.name, kind: 'still', viewport: viewportName,
     source: targetSource(target), file: null, bytes: 0, status: null, error: reason,
   });
 }
 
-// The four-key step vocabulary a video target's `steps` array is limited
-// to -- see the file header. A target list reaches this file as data, not
-// code, so it can carry a selector and a value but never arbitrary
-// JavaScript.
+// A target list reaches this file as data, not code: a step can carry a
+// selector and a value but never arbitrary JavaScript.
 async function runStep(page, step) {
   switch (step.action) {
     case 'click':
@@ -227,35 +229,77 @@ async function runStep(page, step) {
   }
 }
 
+// A separate, unrecorded sign-in first, then the recorded context reuses
+// its cookies -- otherwise every video would open on the login form.
+async function establishSession(browser, baseUrl, credentials, signInConfig) {
+  const context = await browser.newContext({ baseURL: baseUrl });
+  const page = await context.newPage();
+  await signIn(page, baseUrl, credentials, signInConfig);
+  const storageState = await context.storageState();
+  await context.close();
+  return storageState;
+}
+
+// Playwright names a context's recording file itself and only resolves
+// the name after the context that made it has closed, so a target's own
+// video is found by clearing videoDir of everything else first, rather
+// than by asking Playwright for the one path it wrote.
+function claimVideoFile(videoDir, outDir, viewportName, name) {
+  let entries;
+  try {
+    entries = fs.readdirSync(videoDir);
+  } catch {
+    entries = [];
+  }
+  const webm = entries.find((entry) => entry.endsWith('.webm'));
+  let claimed = null;
+  if (webm) {
+    const filePath = path.join(outDir, viewportName, `${name}.webm`);
+    fs.renameSync(path.join(videoDir, webm), filePath);
+    claimed = { file: filePath, bytes: fs.statSync(filePath).size };
+  }
+  fs.rmSync(videoDir, { recursive: true, force: true });
+  return claimed;
+}
+
 async function captureVideo(browser, target, baseUrl, credentials, signInConfig, outDir, viewportName, viewportConfig) {
   const base = { name: target.name, kind: 'video', viewport: viewportName, source: targetSource(target) };
   const videoDir = path.join(outDir, viewportName, `${target.name}-video-tmp`);
   fs.mkdirSync(videoDir, { recursive: true });
 
-  // A video target gets its own context, one per viewport -- the video
-  // size follows the context's viewport, and context.close() is what
-  // completes the file (see the file header).
-  const context = await browser.newContext({ ...viewportConfig, baseURL: baseUrl, recordVideo: { dir: videoDir } });
+  const storageState = target.signed_out ? undefined : await establishSession(browser, baseUrl, credentials, signInConfig);
+  const context = await browser.newContext({
+    ...viewportConfig, baseURL: baseUrl, storageState,
+    recordVideo: { dir: videoDir, size: viewportConfig.viewport },
+  });
+
+  let response = null;
+  let bounced = false;
+  let stepError = null;
   try {
     const page = await context.newPage();
-    if (!target.signed_out) await signIn(page, baseUrl, credentials, signInConfig);
-    await page.goto(new URL(target.path, baseUrl).toString(), { waitUntil: 'networkidle' });
+    response = await page.goto(new URL(target.path, baseUrl).toString(), { waitUntil: 'networkidle' });
+    bounced = redirectedToSignIn(page, target, signInConfig.path);
     for (const step of target.steps || []) await runStep(page, step);
-
-    const video = page.video();
-    await context.close();
-    const tmpPath = video ? await video.path() : null;
-    if (!tmpPath) throw new Error('no video was recorded for this context');
-
-    const filePath = path.join(outDir, viewportName, `${target.name}.webm`);
-    fs.renameSync(tmpPath, filePath);
-    fs.rmSync(videoDir, { recursive: true, force: true });
-    return finalizeEntry({ ...base, file: filePath, bytes: fs.statSync(filePath).size, status: 200 });
   } catch (error) {
-    await context.close().catch(() => {});
-    fs.rmSync(videoDir, { recursive: true, force: true });
-    return finalizeEntry({ ...base, file: null, bytes: 0, status: null, error: error.message });
+    stepError = error;
   }
+  await context.close().catch(() => {});
+  const claimed = claimVideoFile(videoDir, outDir, viewportName, target.name);
+
+  if (!claimed) {
+    return finalizeEntry({ ...base, file: null, bytes: 0, status: null, error: (stepError && stepError.message) || 'no video was recorded for this context' });
+  }
+  if (stepError) {
+    return finalizeEntry({ ...base, file: claimed.file, bytes: claimed.bytes, status: null, error: stepError.message });
+  }
+  if (bounced) {
+    return finalizeEntry({
+      ...base, file: claimed.file, bytes: claimed.bytes, status: null,
+      error: 'redirected to sign-in unexpectedly (session likely not established)',
+    });
+  }
+  return finalizeEntry({ ...base, file: claimed.file, bytes: claimed.bytes, status: response ? response.status() : null });
 }
 
 function escapeHtml(value) {
@@ -325,7 +369,7 @@ async function captureViewport(browser, targets, baseUrl, credentials, signInCon
   };
 
   const stillTargets = targets.filter((t) => t.kind !== 'video');
-  const videoTargets = targets.filter((t) => t.kind === 'video');
+  const videoTargets = viewportName === 'desktop' ? targets.filter((t) => t.kind === 'video') : [];
 
   const signedOutTargets = stillTargets.filter((t) => t.signed_out);
   const restTargets = stillTargets.filter((t) => !t.signed_out);
@@ -354,9 +398,6 @@ async function captureViewport(browser, targets, baseUrl, credentials, signInCon
 
   await context.close();
 
-  // Each video target opens and closes its own context (see
-  // captureVideo), so it runs after the shared stills context above is
-  // done with rather than alongside it.
   for (const target of videoTargets) {
     push(await captureVideo(browser, target, baseUrl, credentials, signInConfig, outDir, viewportName, viewportConfig));
   }
@@ -395,7 +436,12 @@ async function main() {
   console.log(`captured ${manifest.length} entries -> ${path.join(outDir, 'manifest.json')}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// Guarded so importing this module does not also launch a browser.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
+
+export { runStep, computeAttach, redirectedToSignIn, skippedEntry };
