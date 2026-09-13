@@ -2,12 +2,9 @@
   "ticket": "H-8",
   "targets": [
     { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" },
-    { "name": "attach-score-modifier", "kind": "video", "path": "/admin/score_modifiers/new", "steps": [
-      { "action": "fill", "selector": "#score_modifier_name", "value": "Playoff bonus" },
-      { "action": "click", "selector": "#score_modifier_player_id" },
-      { "action": "wait_for", "selector": ".select2-results__option" },
-      { "action": "click", "selector": ".select2-results__option" },
-      { "action": "press", "selector": "#score_modifier_name", "value": "Enter" }
+    { "name": "create-score-modifier", "kind": "video", "path": "/admin/score_modifiers/new", "steps": [
+      { "action": "fill", "selector": "#score_modifier_value", "value": "5" },
+      { "action": "click", "selector": "input[type=\"submit\"]" }
     ] }
   ]
 }
