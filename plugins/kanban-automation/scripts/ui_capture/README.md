@@ -163,11 +163,18 @@ instead of rendering records as a tooling failure (`status: null`, with an
 ```json
 { "ticket": "H-8",
   "targets": [
-    { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" } ] }
+    { "name": "score-modifiers-index", "kind": "still", "path": "/admin/score_modifiers" },
+    { "name": "attach-score-modifier", "kind": "video", "path": "/admin/score_modifiers/new",
+      "steps": [{ "action": "fill", "selector": "#score_modifier_name", "value": "Playoff bonus" }] } ] }
 ```
 
-A target is a page, nothing more: a `name`, `kind` (currently always
-`"still"`), a `path`, and optionally `signed_out: true`.
+A `still` target is a page, nothing more: a `name`, `kind`, a `path`, and
+optionally `signed_out: true`. A `video` target adds `steps`: an ordered
+list of `{action, selector, value}` entries, `action` one of `click`,
+`fill`, `wait_for`, `press` (`value` applies to `fill` and `press` only).
+Each video gets its own browser context, at each viewport, and completes
+when that context closes — one WebM file per viewport, VP8 at 25 frames
+per second.
 
 ## Contact sheets
 
@@ -184,8 +191,10 @@ Everything else is marked `"attach": true` and gets its own full-size file:
   (`status: null` with an `error`).
 - Each contact sheet itself.
 
-An entry with no `file` is always `"attach": false`. The Gatekeeper sends
-every entry whose `attach` is true and whose `file` is not null.
+An entry with no `file` is always `"attach": false`. The Gatekeeper
+publishes every entry whose `attach` is true and whose `file` is not
+null to the ticket's evidence page (see the `ticket-pipeline` skill's
+`evidence-page/README.md`).
 
 ## Exit codes
 
