@@ -695,7 +695,21 @@ whole picture every time, never a diff):
   <url>` (`ticket-pipeline`'s Gatekeeper writes this line — see its
   SKILL.md Phase 5, step 1b), read that URL in and the board links to it
   next to the ticket. Leave it unset when the card has no such line —
-  most tickets never touch application code, so most rows have none.
+  most tickets never touch application code, so most rows have none. Also
+  fold it into `evidence` below — this field disappears with the row once
+  the PR merges, and the page itself does not.
+- `evidence` — every ticket that has ever had an evidence page, kept
+  whether or not its pull request is still open: `{ticket, ticket_url,
+  url, at}`. **This array only grows.** Read the current `state/<project_key>`
+  document first (`read_db`, `db_op: "get"`) and carry every entry it
+  already holds forward into this cycle's full replace, the same pattern
+  `agents.recent` already uses — recomputing it from this cycle's open
+  PRs alone would drop every ticket whose PR has since merged, which
+  defeats the reason this list exists: the ticket's Goal is a page
+  findable without the pull request, and Checkpoint 1 said the page
+  itself stays permanently, so the board's own record of it must too.
+  Add or update an entry (`at` is this cycle's time) for every open PR
+  above that has an `evidence_url`; never remove one.
 - `dispatches` — one per agent `ListAgents` shows active: `{ticket,
   ticket_url, pr, pr_url, task, phase, note, started, state}`. A
   dispatch you know to be orphaned (the vanished-worktree case under
