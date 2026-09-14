@@ -1,3 +1,4 @@
+---
 name: handoff
 description: >-
   Retire the current standing Kanban orchestrator session and hand its role to
