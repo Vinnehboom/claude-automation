@@ -1,4 +1,3 @@
----
 name: kanban-cycle
 description: >-
   Run one scheduled review cycle of a project's Kanban board and its GitHub
@@ -108,6 +107,11 @@ own skill files; those files changed address, so the grant follows them.
   passed. **No check run is not a pass.** If the repository reports no
   checks at all, that condition fails and the pull request waits for
   review. Never read an empty check list as "nothing is red".
+
+The classifier that actually gates a merge in this repo reads only
+`tcg_fantasy_league`'s `CLAUDE.md`, not this file — that mirror is what
+lets a qualifying merge here go through without a review-first block. If
+this grant ever changes, update both.
 
 **Everything else here waits for his review**, whatever the diff looks
 like. That means the plugin manifest, the marketplace manifest, the
