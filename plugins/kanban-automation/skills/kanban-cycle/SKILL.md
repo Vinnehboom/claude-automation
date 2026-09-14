@@ -1,3 +1,4 @@
+---
 name: kanban-cycle
 description: >-
   Run one scheduled review cycle of a project's Kanban board and its GitHub
