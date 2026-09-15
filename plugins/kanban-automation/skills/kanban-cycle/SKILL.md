@@ -394,6 +394,18 @@ ticket-dispatch concurrency in the project repo alone.
   definition). If either fails, skip that ticket and try the next
   candidate instead of blocking the whole cycle on it.
 
+**`min_open_prs`, where the config sets it, is a floor to top up to, not
+just the ceiling's mirror image.** If `open_count < min_open_prs` after
+step 3's triage and ready candidates exist, dispatch enough of them to
+reach the floor (never past `max_open_prs`) — this cycle, not the next
+scheduled one. This is the same "pick up the next ticket the moment room
+opens" principle already standing (2026-09-10) as step 6's own note,
+just applied repeatedly until the floor is met instead of once. The
+one-new-ticket-per-cycle limit in step 6 governs a normal cycle picking up
+its usual next ticket; topping up a floor that a merge or a resolved
+Checkpoint 1 just opened is the same "don't wait for the next firing"
+case that rule already carves out, not a second exception to invent.
+
 ## 5. Pick the next ready ticket
 
 Fetch the Notion board (`notion_board_url`). Candidates are cards with
