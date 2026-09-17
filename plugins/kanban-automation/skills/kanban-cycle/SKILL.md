@@ -604,6 +604,22 @@ orchestrator's own checkout while any dispatched agent is active, and if
 collision symptoms ever show up (a stray table/migration bleeding across
 branches), that's the first thing to suspect.
 
+**Confirmed, not just hypothetical, generation 15:** this bleeds into the
+orchestrator's own main checkout too, not only between two dispatch
+worktrees — `db/schema.rb` on `main` repeatedly picked up tables from a
+migration that only existed on an open ticket branch (`data_subject_requests`
+from P-14), because a Gatekeeper UI capture or a Developer test run on that
+branch shares the one Postgres instance every worktree uses. It recurred
+across separate turns, including after being discarded once, and both the
+P-14 and H-16 dispatches independently reported the same dirty
+`db/schema.rb` in their own worktrees. Treat any uncommitted `db/schema.rb`
+diff on the orchestrator's own checkout as this hazard by default, not as
+real work to investigate: check it names tables/columns from an open PR's
+migration (it will), then `git restore db/schema.rb` without hesitation. A
+project's stop hook that flags uncommitted changes will fire on this
+repeatedly during active development — that is expected noise from this
+hazard, not a sign something needs committing.
+
 **Trusting local git state:** local `HEAD` — in the orchestrator's own
 checkout and in a dispatched worktree alike — has been observed to
 revert to a stale pre-sync commit even right after a successful push,
