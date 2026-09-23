@@ -33,7 +33,11 @@
 // core still folded into its viewport's contact sheet, true for the sheet
 // itself, a ticket target (still or video), a core page that did not
 // answer 200, or any entry that failed outright (as long as it produced a
-// file at all).
+// file at all). A still entry also carries `full_page`: true when the page
+// was taller than its viewport and so was captured in full instead of
+// cropped to that viewport, false when it fit and was cropped as before,
+// and null when nothing was actually captured (a tooling failure or a
+// skipped sign-in).
 //
 // `status` is either the real numeric HTTP status or null; null (paired
 // with a non-empty `error`) always means a tooling failure, never a page
@@ -182,29 +186,45 @@ function redirectedToSignIn(page, target, signInPath) {
   }
 }
 
+function pageNeedsFullCapture(pageHeight, viewportHeight) {
+  return pageHeight > viewportHeight;
+}
+
 async function captureStill(page, target, baseUrl, outDir, viewportName, signInPath) {
   const filePath = path.join(outDir, viewportName, `${target.name}.png`);
   const base = { name: target.name, kind: 'still', viewport: viewportName, source: targetSource(target) };
   try {
     const response = await page.goto(new URL(target.path, baseUrl).toString(), { waitUntil: 'networkidle' });
-    await page.screenshot({ path: filePath });
+    const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+    const fullPage = pageNeedsFullCapture(pageHeight, page.viewportSize().height);
+    // Chromium caps a single canvas at roughly 16384 device pixels tall;
+    // past that, a full-page shot can come out truncated or with repeated
+    // content instead of erroring. On the mobile viewport's 3x scale that
+    // ceiling is about 5460 CSS pixels of page height. Measured against the
+    // seeded admin players index (50 rows, kaminari's default per-page
+    // limit) at ~2300 CSS pixels -- comfortably under it, worth
+    // re-measuring if that per-page default ever changes.
+    await page.screenshot({ path: filePath, fullPage });
     const bytes = fs.statSync(filePath).size;
     if (redirectedToSignIn(page, target, signInPath)) {
       return finalizeEntry({
-        ...base, file: filePath, bytes, status: null,
+        ...base, file: filePath, bytes, status: null, full_page: fullPage,
         error: 'redirected to sign-in unexpectedly (session likely not established)',
       });
     }
-    return finalizeEntry({ ...base, file: filePath, bytes, status: response ? response.status() : null });
+    return finalizeEntry({
+      ...base, file: filePath, bytes, full_page: fullPage,
+      status: response ? response.status() : null,
+    });
   } catch (error) {
-    return finalizeEntry({ ...base, file: null, bytes: 0, status: null, error: error.message });
+    return finalizeEntry({ ...base, file: null, bytes: 0, status: null, full_page: null, error: error.message });
   }
 }
 
 function skippedEntry(target, viewportName, reason) {
   return finalizeEntry({
-    name: target.name, kind: 'still', viewport: viewportName,
-    source: targetSource(target), file: null, bytes: 0, status: null, error: reason,
+    name: target.name, kind: 'still', viewport: viewportName, source: targetSource(target),
+    file: null, bytes: 0, status: null, full_page: null, error: reason,
   });
 }
 
@@ -377,7 +397,9 @@ async function captureViewport(browser, targets, baseUrl, credentials, signInCon
   const context = await browser.newContext({ ...viewportConfig, baseURL: baseUrl });
   const page = await context.newPage();
 
-  for (const target of signedOutTargets) push(await captureStill(page, target, baseUrl, outDir, viewportName, signInConfig.path));
+  for (const target of signedOutTargets) {
+    push(await captureStill(page, target, baseUrl, outDir, viewportName, signInConfig.path));
+  }
 
   let signInError = null;
   if (restTargets.length > 0) {
@@ -444,4 +466,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { runStep, computeAttach, redirectedToSignIn, skippedEntry };
+export { runStep, computeAttach, redirectedToSignIn, skippedEntry, pageNeedsFullCapture, captureStill };
