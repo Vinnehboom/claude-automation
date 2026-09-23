@@ -150,8 +150,16 @@ instead of the configuration error it is.
   otherwise fold into its contact sheet.
 
 Every target is captured at two viewports: desktop (1440x900) and mobile
-(390x844, `deviceScaleFactor: 3`, so the mobile PNG comes out at
-1170x2532).
+(390x844, `deviceScaleFactor: 3`). A page that fits in one screen comes
+out at the viewport's own size times that scale factor — 1170x2532 for
+mobile. A page taller than its viewport comes out taller still (see
+below).
+
+A page taller than the viewport it was captured at gets a full-page shot
+instead of a crop to that viewport: `capture.mjs` measures the page's
+height right after it loads, and compares it against the viewport height.
+A page that fits in one screen gets the plain viewport crop, as before.
+Each still's manifest entry carries this result as `full_page`.
 
 Every `signed_out` target is captured before the run signs in. Everything
 else is captured signed in. A page that quietly bounces to the sign-in page
@@ -184,6 +192,13 @@ attach each one at full size, `capture.mjs` lays every core still that
 answered `200` into one grid per viewport (`contact-sheet.png`) with a
 caption naming the page and its status, and marks those stills
 `"attach": false` in the manifest.
+
+A tile shows its still's image at full length, whatever that still's
+`full_page` value is: each tile scales its image down to the grid
+column's own width, same as any other tile, and nothing then crops or
+shrinks it further to match a shorter row-mate's height. The sheet's
+tiles size to their own row's tallest image, so a row with a full-page
+still becomes taller than a row of plain crops.
 
 Everything else is marked `"attach": true` and gets its own full-size file:
 
