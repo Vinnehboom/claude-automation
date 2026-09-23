@@ -1,13 +1,20 @@
 // Unit tests for capture.mjs's pure logic: the step dispatch, the
-// attach-worthiness rule, and the sign-in-bounce check. Anything that
-// drives a real browser (captureStill, captureVideo, buildContactSheet)
-// has no automated test here -- run.sh's own test suite in this same
-// directory covers the boot/run half instead.
+// attach-worthiness rule, the sign-in-bounce check, and the full-page
+// decision. captureStill's own wiring of that decision into a screenshot
+// call is exercised below too, against a fake page -- no real browser.
+// captureVideo and buildContactSheet still have no automated test here;
+// run.sh's own test suite in this same directory covers the boot/run half
+// instead.
 //
 // Run directly: node --test scripts/ui_capture/test/capture_logic_test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runStep, computeAttach, redirectedToSignIn, skippedEntry } from '../capture.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  runStep, computeAttach, redirectedToSignIn, skippedEntry, pageNeedsFullCapture, captureStill,
+} from '../capture.mjs';
 
 function fakePage() {
   const calls = [];
@@ -87,6 +94,76 @@ test('redirectedToSignIn is true when a different target bounced there', () => {
 test('redirectedToSignIn is false when the page landed where it was sent', () => {
   const page = { url: () => 'http://127.0.0.1:1/admin/players' };
   assert.equal(redirectedToSignIn(page, { path: '/admin/players' }, '/users/sign_in'), false);
+});
+
+test('pageNeedsFullCapture is false when the page is shorter than its viewport', () => {
+  assert.equal(pageNeedsFullCapture(600, 900), false);
+});
+
+test('pageNeedsFullCapture is false when the page exactly fills its viewport', () => {
+  assert.equal(pageNeedsFullCapture(900, 900), false);
+});
+
+test('pageNeedsFullCapture is true when the page is taller than its viewport', () => {
+  assert.equal(pageNeedsFullCapture(2400, 900), true);
+});
+
+// A page object standing in for Playwright's, so captureStill's own wiring
+// (does it read the page height, does it pass fullPage through) is under
+// test, not just pageNeedsFullCapture in isolation -- deleting either call
+// would still leave pageNeedsFullCapture itself passing.
+function fakeStillPage(pageHeight, viewportHeight) {
+  const calls = { goto: [], evaluate: 0, screenshot: [] };
+  let lastUrl = '';
+  return {
+    calls,
+    viewportSize: () => ({ width: 999, height: viewportHeight }),
+    async goto(url, options) {
+      calls.goto.push([url, options]);
+      lastUrl = url;
+      return { status: () => 200 };
+    },
+    async evaluate() {
+      calls.evaluate += 1;
+      return pageHeight;
+    },
+    async screenshot(options) {
+      calls.screenshot.push(options);
+      fs.writeFileSync(options.path, Buffer.from('fake-png'));
+    },
+    url: () => lastUrl,
+  };
+}
+
+async function withTempOutDir(viewportName, run) {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'capture-still-test-'));
+  fs.mkdirSync(path.join(outDir, viewportName), { recursive: true });
+  try {
+    return await run(outDir);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+}
+
+test('captureStill takes a full-page shot when the page is taller than its viewport', async () => {
+  await withTempOutDir('desktop', async (outDir) => {
+    const page = fakeStillPage(2000, 900);
+    const target = { name: 'admin-players', path: '/admin/players' };
+    const entry = await captureStill(page, target, 'http://127.0.0.1:1', outDir, 'desktop', '/users/sign_in');
+    assert.equal(page.calls.evaluate, 1);
+    assert.equal(page.calls.screenshot[0].fullPage, true);
+    assert.equal(entry.full_page, true);
+  });
+});
+
+test('captureStill takes a viewport-cropped shot when the page fits', async () => {
+  await withTempOutDir('desktop', async (outDir) => {
+    const page = fakeStillPage(600, 900);
+    const target = { name: 'admin-players', path: '/admin/players' };
+    const entry = await captureStill(page, target, 'http://127.0.0.1:1', outDir, 'desktop', '/users/sign_in');
+    assert.equal(page.calls.screenshot[0].fullPage, false);
+    assert.equal(entry.full_page, false);
+  });
 });
 
 test('skippedEntry always reports kind "still", even given a video target', () => {
