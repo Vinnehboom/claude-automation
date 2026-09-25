@@ -11,9 +11,8 @@ the project that uses the plugin.
 
 | Skill | Function |
 | --- | --- |
-| `kanban-cycle` | Runs one scheduled review cycle. It triages open pull requests first, then starts at most one new ticket. |
-| `ticket-pipeline` | Drives one ticket from its Notion card to a reviewed pull request. |
-| `handoff` | Retires the standing orchestrator session and gives the role to a new session. |
+| `kanban-cycle` | Runs one scheduled cycle from the weekly cycle thread of a Project. It finds stuck ticket threads, asks the coordinator for a thread for the next ready ticket, and writes the dashboard. |
+| `ticket-pipeline` | Drives one ticket from its Notion card to a merged pull request, in its own Project thread. |
 | `coding-style` | Records a durable style preference into the style guide page of the project. |
 
 The plugin also ships `scripts/ui_capture/`, the screenshot driver the
@@ -107,7 +106,7 @@ starts at the commit that shipped that version.
 
 | Ref | Version | Content |
 | --- | --- | --- |
-| `main` | latest | The current skills, including the changes for Project threads |
+| `main` | 0.2.0 and later | Project mode: one thread per ticket, a weekly cycle thread. No `handoff` skill. |
 | `release/kanban-automation-0.1` | 0.1.0 | The generational orchestrator: `kanban-cycle`, `ticket-pipeline`, `handoff`, `coding-style` as of 2026-09-25 |
 
 ### Pin a project to a release
