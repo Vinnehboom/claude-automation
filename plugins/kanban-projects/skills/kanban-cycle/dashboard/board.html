@@ -1,0 +1,438 @@
+<title>Orchestrator Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#F3F5F7; --surface:#FFFFFF; --surface-2:#E9EDF2;
+    --ink:#141D29; --ink-2:#3D4A5C; --muted:#69788C;
+    --rule:#D8DEE7; --rule-strong:#B7C2D0;
+    --accent:#1B4C86; --accent-soft:#E3ECF7;
+    --attention:#8F4D00; --attention-soft:#FAEDDA; --attention-edge:#D98A2B;
+    --good:#1B7A4E; --good-soft:#DFEFE7;
+    /* chart series - validated for CVD against the light surface */
+    --s-ticket:#2E6BB8; --s-maint:#C0468A;
+    --st-done:#1B7A4E; --st-review:#2E6BB8; --st-progress:#D98A2B; --st-todo:#D8DEE7;
+    --sans:"Archivo","Helvetica Neue",Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme:dark;
+      --ground:#0C131C; --surface:#141E2B; --surface-2:#1C2836;
+      --ink:#E7ECF3; --ink-2:#BAC6D5; --muted:#8595A9;
+      --rule:#243141; --rule-strong:#3A4B5E;
+      --accent:#7FB0E8; --accent-soft:#16283C;
+      --attention:#EDA845; --attention-soft:#31220F; --attention-edge:#B8792A;
+      --good:#54C48D; --good-soft:#0F2C21;
+      --s-ticket:#4E8FD6; --s-maint:#D164A2;
+      --st-done:#54C48D; --st-review:#4E8FD6; --st-progress:#B8792A; --st-todo:#2B3A4C;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --ground:#0C131C; --surface:#141E2B; --surface-2:#1C2836;
+    --ink:#E7ECF3; --ink-2:#BAC6D5; --muted:#8595A9;
+    --rule:#243141; --rule-strong:#3A4B5E;
+    --accent:#7FB0E8; --accent-soft:#16283C;
+    --attention:#EDA845; --attention-soft:#31220F; --attention-edge:#B8792A;
+    --good:#54C48D; --good-soft:#0F2C21;
+    --s-ticket:#4E8FD6; --s-maint:#D164A2;
+    --st-done:#54C48D; --st-review:#4E8FD6; --st-progress:#B8792A; --st-todo:#2B3A4C;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:15px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent); text-decoration:none; border-bottom:1px solid transparent}
+  a:hover{border-bottom-color:currentColor}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:2px}
+  .wrap{max-width:1080px; margin:0 auto; padding-block:clamp(20px,4vw,44px) 64px; padding-inline:max(16px,2.4vw)}
+
+  .masthead{
+    display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
+    gap:16px; padding-bottom:14px; border-bottom:2px solid var(--ink);
+  }
+  .eyebrow{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  h1{font-size:clamp(1.7rem,3.4vw,2.3rem); font-weight:700; letter-spacing:-.025em; margin:.18em 0 0; text-wrap:balance}
+  .live{display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12px; color:var(--muted)}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none}
+  .live[data-state="live"] .dot{background:var(--good); box-shadow:0 0 0 3px var(--good-soft)}
+  .live[data-state="offline"] .dot{background:var(--attention-edge); box-shadow:0 0 0 3px var(--attention-soft)}
+
+  .tabs{display:flex; flex-wrap:wrap; border:1px solid var(--rule); border-top:none; background:var(--surface)}
+  .tab{
+    font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:.06em;
+    padding:9px 16px; border:none; border-right:1px solid var(--rule); background:none;
+    color:var(--muted); cursor:pointer;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--ink); background:var(--accent-soft); box-shadow:inset 0 -2px 0 var(--accent)}
+
+  .banner{
+    display:flex; gap:10px; padding:10px 14px; margin-top:14px;
+    background:var(--attention-soft); border:1px solid var(--attention-edge);
+    font-size:13.5px; color:var(--ink-2);
+  }
+  .banner b{color:var(--attention)}
+
+  .project{margin-top:34px; display:flex; flex-direction:column; gap:14px}
+  .p-head{
+    display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 16px;
+    padding-bottom:6px; border-bottom:1px solid var(--rule-strong);
+  }
+  .p-head h2{margin:0; font-size:1.25rem; font-weight:700; letter-spacing:-.01em}
+  .p-meta{display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; font-family:var(--mono); font-size:11.5px; color:var(--muted)}
+  .chip{
+    font-family:var(--mono); font-size:10.5px; font-weight:500; letter-spacing:.08em;
+    text-transform:uppercase; padding:2px 7px; white-space:nowrap;
+    border:1px solid var(--rule-strong); color:var(--muted); background:var(--surface);
+  }
+  .chip.warn{color:var(--attention); border-color:var(--attention-edge); background:var(--attention-soft)}
+
+  .panel{border:1px solid var(--rule); background:var(--surface); padding:14px 16px; min-width:0}
+  .panel h3{
+    margin:0 0 10px; font-family:var(--mono); font-size:11px; font-weight:600;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--ink-2);
+    display:flex; justify-content:space-between; gap:10px;
+  }
+  .panel h3 span{font-weight:400; letter-spacing:.04em; text-transform:none; color:var(--muted)}
+  .duo{display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start}
+  @media (min-width:860px){.duo{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+
+  .status-bar{display:flex; height:14px; gap:2px; background:var(--surface)}
+  .status-bar span{display:block; height:100%}
+  .legend{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:8px}
+  .legend span{display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11.5px; color:var(--ink-2); font-variant-numeric:tabular-nums}
+  .legend b{font-weight:600; color:var(--ink)}
+  .swatch{width:10px; height:10px; flex:none}
+
+  .epic{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 12px; padding:7px 0}
+  .epic + .epic{border-top:1px solid var(--rule)}
+  .epic-name{font-size:13.5px; color:var(--ink-2); overflow-wrap:anywhere}
+  .epic-num{font-family:var(--mono); font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .bar{grid-column:1 / -1; height:5px; background:var(--surface-2); overflow:hidden}
+  .bar span{display:block; height:100%; background:var(--accent)}
+  .bar span.full{background:var(--good)}
+
+  .figs{display:flex; flex-wrap:wrap; gap:18px; margin-bottom:10px}
+  .fig{display:flex; flex-direction:column; gap:1px}
+  .fig .n{font-family:var(--mono); font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.15}
+  .fig .k{font-family:var(--mono); font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted)}
+  .chart-scroll{overflow-x:auto}
+  svg{display:block; max-width:100%; height:auto}
+  svg text{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .empty{font-size:14px; color:var(--muted)}
+  .tip{
+    position:fixed; z-index:20; pointer-events:none; opacity:0;
+    background:var(--ink); color:var(--ground); font-family:var(--mono); font-size:11.5px;
+    padding:6px 9px; line-height:1.45; white-space:nowrap;
+  }
+  .tip[data-on="1"]{opacity:1}
+
+  footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--rule); font-size:13px; color:var(--muted); max-width:74ch}
+  footer p{margin:0 0 7px}
+  footer code{font-family:var(--mono); font-size:12px; color:var(--ink-2)}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div>
+      <div class="eyebrow" id="repo-line">Board progress and throughput</div>
+      <h1>Orchestrator Board</h1>
+    </div>
+    <div class="live" id="live" data-state="loading">
+      <span class="dot"></span><span id="live-text">Connecting…</span>
+    </div>
+  </header>
+  <div class="tabs" id="tabs" role="tablist" hidden></div>
+  <div id="banner-slot"></div>
+  <div id="projects"></div>
+
+  <footer>
+    <p>Each project's weekly cycle writes its board counts and merge history here. The page does not read GitHub or Notion by itself, so a project is only as current as its last cycle.</p>
+    <p>Open pull requests, running work and questions for you live in the project threads.</p>
+    <p id="capture-note"></p>
+  </footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var FALLBACK_CAPTURED = "2026-09-22T07:55:00Z";
+  var FALLBACK = [{
+    project: { key: "tcg", name: "TCG Fantasy League", repo: "Vinnehboom/tcg_fantasy_league",
+      board_url: "https://app.notion.com/p/Kanban-board-3a94af79fc01801ea781c9195643d5a0" },
+    as_of: FALLBACK_CAPTURED,
+    board: {
+      totals: { done: 53, review: 0, in_progress: 2, not_started: 46 },
+      epics: [
+        { name: "A - Import infrastructure", done: 9, total: 9 },
+        { name: "B - Pokemon JSON", done: 4, total: 4 },
+        { name: "C - Scoring & pricing", done: 18, total: 31 },
+        { name: "D - Riftbound", done: 0, total: 5 },
+        { name: "M - Communities", done: 0, total: 7 },
+        { name: "No epic", done: 22, total: 39 }
+      ]
+    },
+    throughput: {
+      ticket_count: 41, maintenance_count: 30, ticket_median_hours: 24,
+      weeks: [
+        { week: "2026-08-03", ticket: 1, total: 3 }, { week: "2026-08-10", ticket: 4, total: 9 },
+        { week: "2026-08-17", ticket: 9, total: 10 }, { week: "2026-08-24", ticket: 8, total: 13 },
+        { week: "2026-08-31", ticket: 12, total: 26 }, { week: "2026-09-07", ticket: 6, total: 7 },
+        { week: "2026-09-21", ticket: 2, total: 2 }
+      ]
+    }
+  }];
+
+  /* A weekly cycle leaves a snapshot up to 7 days old; past 8 days one was missed. */
+  var STALE_DAYS = 8;
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function stamp(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return esc(iso || "—");
+    return d.toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+  function daysSince(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? null : (Date.now() - d.getTime()) / 86400000;
+  }
+  function ago(iso) {
+    var days = daysSince(iso);
+    if (days == null) return "";
+    var h = days * 24;
+    if (h < 1) return Math.max(1, Math.round(h * 60)) + " min ago";
+    if (h < 48) return Math.round(h) + "h ago";
+    return Math.round(days) + "d ago";
+  }
+  function link(url, text) {
+    return url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(text) + "</a>" : esc(text);
+  }
+
+  var state = { projects: [], active: "all", live: false };
+  function readPref() { try { return localStorage.getItem("ob.project"); } catch (e) { return null; } }
+  function writePref(v) { try { localStorage.setItem("ob.project", v); } catch (e) { /* private window */ } }
+  function visible() {
+    if (state.active === "all") return state.projects;
+    return state.projects.filter(function (p) { return p.project.key === state.active; });
+  }
+
+  function renderTabs() {
+    var ps = state.projects, tabs = $("tabs");
+    tabs.hidden = ps.length <= 1;
+    if (tabs.hidden) return;
+    var html = ['<button class="tab" role="tab" data-key="all" aria-selected="' + (state.active === "all") + '">All projects</button>'];
+    ps.forEach(function (p) {
+      html.push('<button class="tab" role="tab" data-key="' + esc(p.project.key) + '" aria-selected="' +
+        (state.active === p.project.key) + '">' + esc(p.project.name || p.project.key) + "</button>");
+    });
+    tabs.innerHTML = html.join("");
+  }
+
+  function statusPanel(p) {
+    var t = (p.board && p.board.totals) || {};
+    var parts = [
+      ["done", "Done", "var(--st-done)"],
+      ["review", "In review", "var(--st-review)"],
+      ["in_progress", "In progress", "var(--st-progress)"],
+      ["not_started", "Not started", "var(--st-todo)"]
+    ];
+    var total = parts.reduce(function (n, s) { return n + (t[s[0]] || 0); }, 0);
+    if (!total) return '<div class="panel"><h3>Cards</h3><p class="empty">No card counts recorded.</p></div>';
+    var bar = parts.filter(function (s) { return t[s[0]]; }).map(function (s) {
+      return '<span style="flex:' + t[s[0]] + ' 0 0;background:' + s[2] + '" data-tip="' + t[s[0]] + " " + s[1].toLowerCase() + '"></span>';
+    }).join("");
+    return '<div class="panel"><h3>Cards<span>' + Math.round((t.done || 0) / total * 100) + "% of " + total + " done</span></h3>" +
+      '<div class="status-bar" role="img" aria-label="' + parts.map(function (s) { return (t[s[0]] || 0) + " " + s[1]; }).join(", ") + '">' + bar + "</div>" +
+      '<div class="legend">' + parts.map(function (s) {
+        return '<span><i class="swatch" style="background:' + s[2] + '"></i><b>' + (t[s[0]] || 0) + "</b> " + s[1] + "</span>";
+      }).join("") + "</div></div>";
+  }
+
+  function epicsPanel(p) {
+    var epics = (p.board && p.board.epics) || [];
+    if (!epics.length) return '<div class="panel"><h3>Epics</h3><p class="empty">No epic breakdown recorded.</p></div>';
+    var complete = epics.filter(function (e) { return e.total && e.done === e.total; }).length;
+    return '<div class="panel"><h3>Epics<span>' + complete + " of " + epics.length + " complete</span></h3>" +
+      epics.map(function (e) {
+        var pct = e.total ? Math.round(e.done / e.total * 100) : 0;
+        return '<div class="epic"><span class="epic-name">' + esc(e.name) + "</span>" +
+          '<span class="epic-num">' + e.done + "/" + e.total + "</span>" +
+          '<div class="bar"><span class="' + (pct === 100 ? "full" : "") + '" style="width:' + pct + '%"></span></div></div>';
+      }).join("") + "</div>";
+  }
+
+  function mondayOf(iso) {
+    var d = new Date(iso + "T00:00:00Z");
+    return isNaN(d) ? null : d;
+  }
+  /* Fill weeks with no merges so the x axis stays to scale. */
+  function continuousWeeks(weeks) {
+    var sorted = weeks.slice().sort(function (a, b) { return a.week < b.week ? -1 : 1; });
+    if (!sorted.length) return [];
+    var byKey = {};
+    sorted.forEach(function (w) { byKey[w.week] = w; });
+    var out = [], d = mondayOf(sorted[0].week), end = mondayOf(sorted[sorted.length - 1].week);
+    if (!d || !end) return sorted;
+    while (d <= end) {
+      var k = d.toISOString().slice(0, 10);
+      out.push(byKey[k] || { week: k, ticket: 0, total: 0 });
+      d = new Date(d.getTime() + 7 * 86400000);
+    }
+    return out;
+  }
+
+  function throughputPanel(p) {
+    var tp = p.throughput;
+    var weeks = continuousWeeks((tp && tp.weeks) || []).map(function (w) {
+      return { week: w.week, ticket: w.ticket || 0, maint: Math.max(0, (w.total || 0) - (w.ticket || 0)) };
+    });
+    if (!weeks.length) return '<div class="panel"><h3>Throughput</h3><p class="empty">No merge history recorded yet.</p></div>';
+
+    var W = 520, H = 210, PADL = 30, PADR = 8, PADT = 16, PADB = 44;
+    var max = Math.max(1, Math.max.apply(null, weeks.map(function (w) { return w.ticket + w.maint; })));
+    var step = Math.max(1, Math.ceil(max / 4));
+    var top = Math.ceil(max / step) * step;
+    var iw = W - PADL - PADR, ih = H - PADT - PADB, slot = iw / weeks.length;
+    var bw = Math.max(6, Math.min(40, slot - 10));
+    var y = function (v) { return PADT + ih - (v / top) * ih; };
+    var labelEvery = Math.ceil(weeks.length / 8);
+
+    var parts = [];
+    for (var g = 0; g <= top; g += step) {
+      parts.push('<line x1="' + PADL + '" y1="' + y(g).toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y(g).toFixed(1) + '" stroke="var(--rule)" stroke-width="1"/>');
+      parts.push('<text x="' + (PADL - 7) + '" y="' + (y(g) + 3.5).toFixed(1) + '" font-size="10" fill="var(--muted)" text-anchor="end">' + g + "</text>");
+    }
+    weeks.forEach(function (w, i) {
+      var cx = PADL + slot * (i + 0.5), x = cx - bw / 2, tot = w.ticket + w.maint;
+      var hT = (w.ticket / top) * ih, hM = (w.maint / top) * ih;
+      if (w.maint > 0) {
+        parts.push('<rect x="' + x.toFixed(1) + '" y="' + y(tot).toFixed(1) + '" width="' + bw.toFixed(1) +
+          '" height="' + Math.max(0, hM - 2).toFixed(1) + '" fill="var(--s-maint)" rx="2"/>');
+      }
+      if (w.ticket > 0) {
+        parts.push('<rect x="' + x.toFixed(1) + '" y="' + y(w.ticket).toFixed(1) + '" width="' + bw.toFixed(1) +
+          '" height="' + hT.toFixed(1) + '" fill="var(--s-ticket)" rx="2"/>');
+      }
+      if (tot > 0) {
+        parts.push('<text x="' + cx.toFixed(1) + '" y="' + (y(tot) - 5).toFixed(1) +
+          '" font-size="10.5" font-weight="600" fill="var(--ink-2)" text-anchor="middle">' + tot + "</text>");
+      }
+      var d = mondayOf(w.week);
+      var label = d ? d.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" }) : w.week;
+      if (i % labelEvery === 0) {
+        parts.push('<text x="' + cx.toFixed(1) + '" y="' + (H - PADB + 16) + '" font-size="10" fill="var(--muted)" text-anchor="middle">' + esc(label) + "</text>");
+      }
+      parts.push('<rect x="' + (cx - slot / 2).toFixed(1) + '" y="' + PADT + '" width="' + slot.toFixed(1) + '" height="' + ih +
+        '" fill="transparent" data-tip="Week of ' + esc(label) + ": " + w.ticket + " ticket, " + w.maint + ' upkeep"/>');
+    });
+    parts.push('<text x="' + PADL + '" y="' + (H - 6) + '" font-size="9.5" fill="var(--muted)">Pull requests merged, by week</text>');
+
+    return '<div class="panel"><h3>Throughput<span>' + weeks.length + " weeks</span></h3>" +
+      '<div class="figs">' +
+      '<div class="fig"><span class="n">' + (tp.ticket_count || 0) + '</span><span class="k">ticket PRs</span></div>' +
+      '<div class="fig"><span class="n">' + (tp.maintenance_count || 0) + '</span><span class="k">upkeep PRs</span></div>' +
+      (tp.ticket_median_hours != null ? '<div class="fig"><span class="n">' + esc(tp.ticket_median_hours) + 'h</span><span class="k">median open</span></div>' : "") +
+      "</div>" +
+      '<div class="legend" style="margin:0 0 6px">' +
+      '<span><i class="swatch" style="background:var(--s-ticket)"></i>Ticket work</span>' +
+      '<span><i class="swatch" style="background:var(--s-maint)"></i>Automation upkeep</span></div>' +
+      '<div class="chart-scroll"><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Pull requests merged per week, split into ticket work and automation upkeep">' +
+      parts.join("") + "</svg></div></div>";
+  }
+
+  function renderProject(p) {
+    var days = daysSince(p.as_of);
+    var stale = days != null && days > STALE_DAYS;
+    var pr = p.project || {};
+    return '<section class="project" aria-label="' + esc(pr.name || pr.key) + '">' +
+      '<div class="p-head"><h2>' + esc(pr.name || pr.key) + "</h2>" +
+      '<div class="p-meta">' +
+      (pr.repo ? link("https://github.com/" + pr.repo, pr.repo) : "") +
+      (pr.board_url ? link(pr.board_url, "Notion board") : "") +
+      '<span title="' + esc(stamp(p.as_of)) + '">Updated ' + esc(ago(p.as_of) || "never") + "</span>" +
+      (stale ? '<span class="chip warn">A cycle was missed</span>' : "") +
+      "</div></div>" +
+      statusPanel(p) +
+      '<div class="duo">' + epicsPanel(p) + throughputPanel(p) + "</div>" +
+      "</section>";
+  }
+
+  function paint() {
+    renderTabs();
+    var vis = visible();
+    $("projects").innerHTML = vis.length ? vis.map(renderProject).join("")
+      : '<p class="empty" style="margin-top:34px">No project has written to this board yet.</p>';
+    $("repo-line").textContent = state.projects.length > 1
+      ? state.projects.length + " projects · progress and throughput"
+      : "Board progress and throughput";
+  }
+
+  function setLive(s, text) { $("live").dataset.state = s; $("live-text").textContent = text; }
+  function offline(msg) {
+    state.live = false;
+    setLive("offline", "Not live");
+    $("banner-slot").innerHTML = '<div class="banner"><b>Not live.</b><span>' + esc(msg) +
+      " Showing the copy built into this page on " + stamp(FALLBACK_CAPTURED) + ".</span></div>";
+    paint();
+  }
+
+  state.projects = FALLBACK;
+  state.active = readPref() || "all";
+  paint();
+  $("capture-note").textContent = "Fallback copy built into this page on " + stamp(FALLBACK_CAPTURED) + ".";
+
+  $("tabs").addEventListener("click", function (ev) {
+    var t = ev.target.closest(".tab");
+    if (!t) return;
+    state.active = t.dataset.key;
+    writePref(state.active);
+    paint();
+  });
+
+  var tip = $("tip");
+  document.addEventListener("mousemove", function (ev) {
+    var t = ev.target.closest ? ev.target.closest("[data-tip]") : null;
+    if (!t) { tip.dataset.on = "0"; return; }
+    tip.textContent = t.getAttribute("data-tip");
+    tip.dataset.on = "1";
+    tip.style.left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 10, ev.clientX + 12)) + "px";
+    tip.style.top = (ev.clientY - tip.offsetHeight - 10) + "px";
+  });
+
+  if (!window.claude || typeof window.claude.use !== "function") {
+    offline("This copy of the page cannot reach the live store.");
+  } else {
+    window.claude.use("db").then(function (db) {
+      if (!db) { offline("The live store did not answer."); return; }
+      state.live = true;
+      setLive("live", "Live");
+      db.collection("state").onSnapshot(function (q) {
+        var ps = q.docs.map(function (d) {
+          var v = d.data() || {};
+          if (!v.project) v.project = { key: d.id, name: d.id };
+          return v;
+        }).sort(function (a, b) { return (a.project.name || "").localeCompare(b.project.name || ""); });
+        if (ps.length) state.projects = ps;
+        if (state.active !== "all" && !ps.some(function (p) { return p.project.key === state.active; })) state.active = "all";
+        $("banner-slot").innerHTML = "";
+        $("capture-note").textContent = "";
+        setLive("live", "Live");
+        paint();
+      }, function () { offline("The live snapshot stopped updating."); });
+    }).catch(function () { offline("The live store could not be reached."); });
+  }
+})();
+</script>

@@ -9,13 +9,35 @@
       "name": "kanban-automation",
       "source": "./plugins/kanban-automation",
       "displayName": "Kanban automation",
-      "description": "Scheduled kanban board cycles and the ticket pipeline that drives one card to a reviewed pull request, run from Claude Project threads.",
+      "description": "The generational-orchestrator version: scheduled kanban board cycles, the ticket pipeline, and orchestrator handoff.",
       "author": {
         "name": "Vinnehboom"
       },
       "repository": "https://github.com/Vinnehboom/claude-automation",
       "category": "productivity",
-      "tags": ["kanban", "notion", "github", "orchestration"]
+      "tags": [
+        "kanban",
+        "notion",
+        "github",
+        "orchestration"
+      ]
+    },
+    {
+      "name": "kanban-projects",
+      "source": "./plugins/kanban-projects",
+      "displayName": "Kanban for Projects",
+      "description": "The kanban automation for Claude Projects: a weekly cycle thread, and the ticket pipeline in one thread per ticket.",
+      "author": {
+        "name": "Vinnehboom"
+      },
+      "repository": "https://github.com/Vinnehboom/claude-automation",
+      "category": "productivity",
+      "tags": [
+        "kanban",
+        "notion",
+        "github",
+        "orchestration"
+      ]
     }
   ]
 }

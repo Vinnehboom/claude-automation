@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Stand-in for the real `dropdb` binary, used only by run_tests.sh. Records
+# its own invocation instead of touching a real PostgreSQL server.
+echo "dropdb $*" >> "${MOCK_DROPDB_LOG:?MOCK_DROPDB_LOG not set}"
+exit 0
