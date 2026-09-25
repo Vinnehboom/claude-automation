@@ -95,6 +95,48 @@ uncommitted change in every session.
 Trust the workspace when Claude Code asks for it. Other project settings,
 such as permissions and hooks, load only after you trust the folder.
 
+## Versions
+
+`main` is the latest version of the plugin. A skill-only pull request
+merges to `main` without a review, so a project that installs from `main`
+gets each change at its next session start.
+
+A project that must not change pins a release branch instead. Each
+release branch is named `release/kanban-automation-<major>.<minor>` and
+starts at the commit that shipped that version.
+
+| Ref | Version | Content |
+| --- | --- | --- |
+| `main` | latest | The current skills, including the changes for Project threads |
+| `release/kanban-automation-0.1` | 0.1.0 | The generational orchestrator: `kanban-cycle`, `ticket-pipeline`, `handoff`, `coding-style` as of 2026-09-25 |
+
+### Pin a project to a release
+
+Add the ref to the marketplace source in the setup script, after a `#`:
+
+```sh
+claude plugin marketplace add 'Vinnehboom/claude-automation#release/kanban-automation-0.1'
+claude plugin marketplace update vinnie-automation
+claude plugin install kanban-automation@vinnie-automation --scope user
+```
+
+`marketplace update` stays on the pinned ref. To follow the latest
+version, write the source without a `#` suffix.
+
+The pin belongs to the environment, not to the project, because the
+setup script installs the plugin. Two projects that share one
+environment get the same version. If one project must follow `main`
+and another must stay pinned, give them separate environments.
+
+### Rules for a release branch
+
+- Merge to a release branch only a fix for a project that stays on it.
+  Do not merge new features there.
+- Change `version` in `plugins/kanban-automation/.claude-plugin/plugin.json`
+  when a release branch starts, and when a change on `main` breaks a
+  pinned project. The version names the release. It does not select it.
+- Keep a release branch until no environment pins it.
+
 ## Skill names change after the install
 
 A plugin gives its skills a namespace. `/kanban-cycle` becomes
