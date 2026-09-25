@@ -61,7 +61,7 @@ Only capture when it reads as a *durable* preference, not a one-off:
      it is not ticked already. Then mirror the same one-line rule into the
      project's `CLAUDE.md` hot list. Those are the only two places it
      lives — the column and that one text copy, which exists because
-     `CLAUDE.md` auto-loads into every dispatch and still works when Notion
+     `CLAUDE.md` auto-loads into every session and still works when Notion
      is unreachable. Do not add a third.
    - **Propose a mechanical check** when a machine can test the rule — a
      rubocop cop, a lint rule, a git hook. Say so to the user and let them

@@ -1,18 +1,32 @@
 # claude-automation
 
-This repository is a Claude Code plugin marketplace. It holds one plugin,
-`kanban-automation`. The plugin runs a project's Notion kanban board
-against that project's GitHub pull requests.
+This repository is a Claude Code plugin marketplace. It holds two
+plugins. Both run a project's Notion kanban board against that project's
+GitHub pull requests. A project installs one of them, not both.
+
+| Plugin | Version | For |
+| --- | --- | --- |
+| `kanban-projects` | 0.2.0 | Projects that run in a Claude Project: a weekly cycle thread, and one thread per ticket. |
+| `kanban-automation` | 0.1.0 | Projects that still run a standing orchestrator session with `/handoff`. |
 
 The logic lives here. The pointers to each board and repository live in
 the project that uses the plugin.
 
-## Skills in the plugin
+## Skills in `kanban-projects`
 
 | Skill | Function |
 | --- | --- |
 | `kanban-cycle` | Runs one scheduled cycle from the weekly cycle thread of a Project. It finds stuck ticket threads, asks the coordinator for a thread for the next ready ticket, and writes the dashboard. |
 | `ticket-pipeline` | Drives one ticket from its Notion card to a merged pull request, in its own Project thread. |
+| `coding-style` | Records a durable style preference into the style guide page of the project. |
+
+## Skills in `kanban-automation`
+
+| Skill | Function |
+| --- | --- |
+| `kanban-cycle` | Runs one scheduled review cycle. It triages open pull requests first, then starts at most one new ticket. |
+| `ticket-pipeline` | Drives one ticket from its Notion card to a reviewed pull request. |
+| `handoff` | Retires the standing orchestrator session and gives the role to a new session. |
 | `coding-style` | Records a durable style preference into the style guide page of the project. |
 
 The plugin also ships `scripts/ui_capture/`, the screenshot driver the
@@ -50,6 +64,9 @@ phase writes ordinary prose. Nothing else breaks.
 
 ## Install the plugin in a project
 
+Replace `<plugin>` below with `kanban-projects` or `kanban-automation`
+(see the table at the top).
+
 The install is what puts the plugin on disk. A declaration in
 `.claude/settings.json` does not. Measured 2026-09-06: a project settings
 file that carries `extraKnownMarketplaces` and `enabledPlugins` installs
@@ -61,7 +78,7 @@ a request.
 
 ```sh
 claude plugin marketplace add Vinnehboom/claude-automation
-claude plugin install kanban-automation@vinnie-automation --scope user
+claude plugin install <plugin>@vinnie-automation --scope user
 ```
 
 ### In a cloud session
@@ -72,7 +89,7 @@ lines in the setup script of the environment instead:
 ```sh
 claude plugin marketplace add Vinnehboom/claude-automation
 claude plugin marketplace update vinnie-automation
-claude plugin install kanban-automation@vinnie-automation --scope user
+claude plugin install <plugin>@vinnie-automation --scope user
 ```
 
 CAUTION: Add this repository as a source on the ENVIRONMENT, not on one
@@ -96,45 +113,26 @@ such as permissions and hooks, load only after you trust the folder.
 
 ## Versions
 
-`main` is the latest version of the plugin. A skill-only pull request
-merges to `main` without a review, so a project that installs from `main`
-gets each change at its next session start.
-
-A project that must not change pins a release branch instead. Each
-release branch is named `release/kanban-automation-<major>.<minor>` and
-starts at the commit that shipped that version.
-
-| Ref | Version | Content |
-| --- | --- | --- |
-| `main` | 0.2.0 and later | Project mode: one thread per ticket, a weekly cycle thread. No `handoff` skill. |
-| `release/kanban-automation-0.1` | 0.1.0 | The generational orchestrator: `kanban-cycle`, `ticket-pipeline`, `handoff`, `coding-style` as of 2026-09-25 |
-
-### Pin a project to a release
-
-Add the ref to the marketplace source in the setup script, after a `#`:
+The two plugins live side by side on `main`. Each project picks one in
+its setup script, so a change to one plugin does not reach projects that
+install the other.
 
 ```sh
-claude plugin marketplace add 'Vinnehboom/claude-automation#release/kanban-automation-0.1'
+claude plugin marketplace add Vinnehboom/claude-automation
 claude plugin marketplace update vinnie-automation
-claude plugin install kanban-automation@vinnie-automation --scope user
+claude plugin install kanban-projects@vinnie-automation --scope user
 ```
 
-`marketplace update` stays on the pinned ref. To follow the latest
-version, write the source without a `#` suffix.
+For the orchestrator version, install `kanban-automation@vinnie-automation`
+instead. Do not install both in one environment: their skills have the
+same names, and only the namespace (`/kanban-projects:kanban-cycle`,
+`/kanban-automation:kanban-cycle`) tells them apart.
 
-The pin belongs to the environment, not to the project, because the
-setup script installs the plugin. Two projects that share one
-environment get the same version. If one project must follow `main`
-and another must stay pinned, give them separate environments.
-
-### Rules for a release branch
-
-- Merge to a release branch only a fix for a project that stays on it.
-  Do not merge new features there.
-- Change `version` in `plugins/kanban-automation/.claude-plugin/plugin.json`
-  when a release branch starts, and when a change on `main` breaks a
-  pinned project. The version names the release. It does not select it.
-- Keep a release branch until no environment pins it.
+Change `version` in a plugin's `.claude-plugin/plugin.json` when you
+change that plugin. The branch `release/kanban-automation-0.1` holds
+`kanban-automation` 0.1.0 as it was before this split. A setup script can
+still pin it with `#release/kanban-automation-0.1` on the marketplace
+source.
 
 ## Skill names change after the install
 
