@@ -1,7 +1,7 @@
 {
   "name": "kanban-automation",
-  "description": "Runs a project's Notion kanban board against its GitHub pull requests: scheduled triage cycles, a planner-to-reviewer ticket pipeline, and orchestrator handoff. Each project supplies its own board and repository through config files in .claude/.",
-  "version": "0.1.0",
+  "description": "Runs a project's Notion kanban board against its GitHub pull requests: weekly cycle threads, and a planner-to-reviewer ticket pipeline that runs in one Project thread per ticket. Each project supplies its own board and repository through config files in .claude/.",
+  "version": "0.2.0",
   "author": {
     "name": "Vinnehboom"
   },

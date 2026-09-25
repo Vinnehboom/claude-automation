@@ -9,7 +9,7 @@
       "name": "kanban-automation",
       "source": "./plugins/kanban-automation",
       "displayName": "Kanban automation",
-      "description": "Scheduled kanban board cycles, the ticket pipeline that drives one card to a reviewed pull request, and orchestrator handoff.",
+      "description": "Scheduled kanban board cycles and the ticket pipeline that drives one card to a reviewed pull request, run from Claude Project threads.",
       "author": {
         "name": "Vinnehboom"
       },
