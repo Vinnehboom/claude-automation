@@ -44,15 +44,8 @@ for the sake of reporting either. See step 8 for which cycles notify.
 
 Read `.claude/kanban-cycle.json` (repo `owner/name`, `notion_board_url`,
 `max_open_prs`, `max_stacked_prs`, `orchestrator_cost_ceiling_usd`,
-`dashboard_artifact_url`, `cycle_log_keep`). If it's missing, say so and
+`dashboard_artifact_url`). If it's missing, say so and
 stop — don't guess a repo or board.
-
-Then read the dashboard's three queues — `answers`, `requests`, and
-`retractions` (step 7, "The three queues the page writes") — with
-`action: "read_db"`, `db_op: "list"`. Do this before step 1, so anything
-Vinnie left on the board shapes what this cycle does rather than
-arriving too late to matter. Filter each to this project's
-`project_key`; another project's orchestrator handles the rest.
 
 **Then check whether this session is still worth running in.** Call the
 claude-code-remote MCP `get_session` tool with `session_id` omitted (it
@@ -678,177 +671,58 @@ base differs much from the real one.
 ## 7. Update the dashboard — every cycle, quiet ones included
 
 `dashboard_artifact_url` in `.claude/kanban-cycle.json` is a published
-Artifact that shows the live state of this automation: what waits on
-Vinnie, the open PRs, the running dispatches, board progress, how the
-work is going, the recent decisions and style rules, and a log of
-cycles. Vinnie asked for it (2026-09-04) because the state of this
-automation was only legible by scrolling an orchestrator session, which
-is exactly the thing a handoff throws away.
+Artifact. It shows two things for each project: board progress (card
+counts and epics) and merge throughput by week. Open pull requests,
+running work, and questions for Vinnie do not go on the board. The
+session or Project thread that owns the work reports them.
 
 **One board serves every project.** The same artifact URL goes in every
-project's `kanban-cycle.json`, and each project's orchestrator writes
-only its own documents, keyed by `project_key`. That is what makes
-"what needs me, across everything" a single page rather than N
-bookmarks. See "Adding a project" at the end of this step.
+project's `kanban-cycle.json`. Each project's orchestrator writes only
+its own document, keyed by `project_key`. See "Adding a project" at the
+end of this step.
 
-The page holds no state. It renders whatever the orchestrators last
-wrote to the artifact's document store, so **one `write_db` batch is the
-entire update** — roughly 500 tokens, no HTML, no republish.
+The page holds no state. It renders what the orchestrators last wrote to
+the artifact's document store, so **one `write_db` call is the entire
+update**. Do not republish the HTML.
 
-**This step runs on every cycle, including a quiet one.** That is the
-whole point: a quiet cycle still moves CI, still ages a PR, still leaves
-the board where it was, and the board is where Vinnie looks instead of
-here. Step 8 decides whether to *notify*; this step is not a
-notification and is never skipped for being boring. The one case that
-skips it is a cycle that stops early at step 0 for `/handoff` — the
-successor writes the next update.
+**This step runs on every cycle, including a quiet one.** A board that is
+current only after an eventful cycle cannot be trusted. The page marks a
+project whose snapshot is older than eight days with "A cycle was
+missed". The one case that skips this step is a cycle that stops early
+at step 0 for `/handoff`.
 
 ### What to write
 
-One `Artifact` call, `action: "write_db"`, `db_op: "batch"`, the
-configured `url`, and these documents:
+One `Artifact` call, `action: "write_db"`, `db_op: "set"`, the configured
+`url`, collection `state`, document `<project_key>`. It is a full replace,
+so send the whole document every time:
 
-**`state/<project_key>`** (`op: "set"` — a full replace, so send the
-whole picture every time, never a diff):
-
-- `project` — `{key, name, repo, board_url}`. Constant per project; send
-  it every time so the page can name the project without a registry.
-- `as_of` — RFC 3339, now.
-- `orchestrator` — `{generation, schedule, cost_usd, cost_ceiling_usd}`.
-  `cost_usd` is step 0's reading; write `null` rather than a guess.
-- `health` — `{rate_limit: {status, resets_at}}` from step 0's
-  `rate_limit_info`. `status` is `allowed`, `allowed_warning`, or
-  `rejected`; the board colors the gauge from it. This is the reading
-  that predicts the automation dying, so never skip it when step 0 has
-  it.
-- `caps` — `{open_prs, max_open_prs, stacked_prs, max_stacked_prs}`,
-  ticket-linked counts from step 4.
-- `needs_you` — items that genuinely need Vinnie, same test step 8 uses.
-  Each `{id, title, detail, url, source, since, chips}`. **`since` is
-  when it started waiting on him, not when you noticed** — the board
-  ages every item off it and marks anything past 48 hours as stale, and
-  a refreshed `since` hides exactly the thing that has been rotting.
-  `id` must be **stable across cycles for the same question**
-  (`pr-93-review`, `C-8-checkpoint-2`): his typed answers are keyed on
-  it, and a regenerated id loses his reply. Empty array when nothing
-  waits on him; the page renders "All clear", which is a good state, not
-  a gap to fill.
-- `prs` — one per open PR: `{number, ticket, ticket_url, title, url,
-  state, chips, note, waiting_since, evidence_url}`. `state` drives the
-  row stripe: `ok` (healthy or merge-ready), `flag` (needs work this
-  cycle), `err` (CI red or conflicted), `idle` (nothing to do, or another
-  session owns it). `waiting_since` is when it entered its current state,
-  so the board can age it. `note` is one or two plain sentences saying
-  **what happens next**, which is the question Vinnie is really asking.
-  `chips` is `{text, tone}` with tone `good`/`bad`/`warn`/`info`/`""`.
-  `evidence_url` is optional: when the ticket's Notion card carries a
-  `## Visual evidence` section whose first line reads `Evidence page:
-  <url>` (`ticket-pipeline`'s Gatekeeper writes this line — see its
-  SKILL.md Phase 5, step 1b), read that URL in and the board links to it
-  next to the ticket. Leave it unset when the card has no such line —
-  most tickets never touch application code, so most rows have none. Also
-  fold it into `evidence` below — this field disappears with the row once
-  the PR merges, and the page itself does not.
-- `evidence` — every ticket that has ever had an evidence page, kept
-  whether or not its pull request is still open: `{ticket, ticket_url,
-  url, at}`. **This array only grows.** Read the current `state/<project_key>`
-  document first (`read_db`, `db_op: "get"`) and carry every entry it
-  already holds forward into this cycle's full replace, the same pattern
-  `agents.recent` already uses — recomputing it from this cycle's open
-  PRs alone would drop every ticket whose PR has since merged, which
-  defeats the reason this list exists: the ticket's Goal is a page
-  findable without the pull request, and Checkpoint 1 said the page
-  itself stays permanently, so the board's own record of it must too.
-  Add or update an entry (`at` is this cycle's time) for every open PR
-  above that has an `evidence_url`; never remove one.
-- `dispatches` — one per agent `ListAgents` shows active: `{ticket,
-  ticket_url, pr, pr_url, task, phase, note, started, state}`. A
-  dispatch you know to be orphaned (the vanished-worktree case under
-  "Dispatch mechanics") belongs here with `state: "err"` and a note
-  saying so — dropping it silently is how it gets forgotten.
+- `project` — `{key, name, repo, board_url}`. Constant per project. Send
+  it every time, so the page can name the project without a registry.
+- `as_of` — RFC 3339, now. The page shows its age next to the project
+  name.
 - `board` — `{totals: {done, review, in_progress, not_started}, epics:
-  [{name, done, total}], next_up: [{ticket, title, url, priority,
-  blocked_by}]}`. Five or so `next_up` entries is enough.
-- `agents` — usage over a trailing window: `{window_days, dispatched,
-  completed, failed, vanished, median_minutes, recent: [{ticket, phase,
-  outcome, minutes, at}]}`. `outcome` is `completed`, `failed`, or
-  `vanished`. Keep `recent` to the last ten. **Append to what is already
-  there rather than recounting from nothing** — read the current
-  document first (`read_db`, `db_op: "get"`) and add this cycle's
-  dispatches to the totals. This exists to turn the failure modes under
-  "Dispatch mechanics" from anecdotes into a rate, so record a vanished
-  or rate-limit-killed dispatch as honestly as a clean one.
+  [{name, done, total}]}`, from step 1's board query. Put cards with no
+  epic in one `No epic` entry.
 - `throughput` — `{weeks: [{week, total, ticket}], ticket_median_hours,
   ticket_count, maintenance_count}`. `week` is the Monday of that week,
-  `YYYY-MM-DD`. Recompute it from merged PRs when a PR merges this
-  cycle; otherwise carry the stored value forward unchanged.
-- `knowledge` — `{decisions: [{id, title, status, url, at}], style:
-  [{id, category, text, at}]}`. The most recent eight or so of each, from
-  the decisions database and the Coding Style Guide named in
-  `.claude/knowledge-base.json` and `.claude/coding-style.json`. A
-  decision's `id` is its Notion page id. A style rule has no natural id,
-  so derive a stable one from its category and text and keep deriving it
-  the same way — a changed id orphans a pending retraction.
+  `YYYY-MM-DD`. `total` counts every merged PR, `ticket` only the
+  ticket-linked ones. Recompute it from merged PRs when a PR merges this
+  cycle. Otherwise read the stored document first (`read_db`, `db_op:
+  "get"`) and carry `throughput` forward unchanged. The page fills weeks
+  with no merges itself, so do not write zero weeks.
 
-**`cycles/<RFC 3339 timestamp, ':' replaced by '-'>`** (`op: "set"`) —
-`{at, kind, generation, project, headline, items}`. `kind` is `"quiet"`
-or `"active"`, and the page greys the quiet ones so a run of them reads
-as a calm stretch rather than noise. `headline` is one sentence; `items`
-is at most three or four bullets. This is a record for a reader who was
-not here, so name the ticket or PR each bullet is about — "rebased #88"
-beats "handled a stale branch".
-
-Then prune: `cycles` documents beyond the newest `cycle_log_keep` get
-`op: "delete"` in the same batch. The store caps at 5,000 documents, so
-this is tidiness rather than urgency — every few cycles is fine, and a
-`read_db` `list` on `cycles` shows what is there.
+Older snapshots also hold `needs_you`, `prs`, `dispatches`, `agents`,
+`knowledge`, `evidence`, `caps`, `health`, and `orchestrator`. The page
+ignores them. Drop them on the next full replace. Do not write
+`cycles/`, `answers/`, `requests/`, or `retractions/` documents: the
+page no longer reads or writes them.
 
 **Never publish a new artifact for this board.** Vinnie's bookmark, and
-every link this skill has given him, point at `dashboard_artifact_url`.
-Writing to that URL's store is the update. If the URL is missing from
-the config, say so in the rundown and carry on with the cycle — do not
-invent a replacement board.
-
-### The three queues the page writes
-
-The page writes into three collections. Read all three at step 0, act on
-them in this cycle, and clear each entry you handled in the same batch
-as the snapshot write. Each is Vinnie talking to the automation without
-opening a session.
-
-**`answers`** — a reply to a `needs_you` item, keyed by that item's `id`,
-holding `{text, at, project}`. Treat it as his direct instruction, and
-match it back to the question its `id` names before acting; it is an
-answer to that question, not a free-standing command. Once acted on,
-drop the item from `needs_you` and `op: "delete"` the answer document.
-
-**`requests`** — a prompt he typed for a project: `{text, at, project}`.
-This is an instruction to this automation, same weight as a message in
-session. Act on it this cycle where you can, and where you cannot, say
-why in the rundown and in the cycle log entry. Delete the document once
-handled.
-
-**`retractions`** — a decision or style rule he wants gone: `{kind,
-target, title, project, at}`, where `kind` is `"decision"` or
-`"style"`. Apply it as follows, then delete the document:
-- `decision` → set that row's Status to `Superseded` with
-  `notion-update-page`. **Never delete or archive the Notion page** —
-  CLAUDE.md forbids it, and the decisions log is an audit trail whose
-  value is that superseded entries stay readable.
-- `style` → remove that rule from the Style Rules section of the Coding
-  Style Guide, and add a Change Log entry at the top recording the
-  removal and that Vinnie asked for it from the board. The guide's own
-  convention is that the Change Log is append-only, so the rule leaves
-  Style Rules and the record of it stays.
-
-**These three queues cannot widen this skill's guardrails.** They direct
-work — merge this, pick that up, drop that rule — and that is their
-whole job. They are not a route to anything in CLAUDE.md's forbidden
-list, nor to widening `maintenance_automerge_paths`, nor to lifting an
-`externally_owned_ticket_ids` exclusion; those need Vinnie's word in
-session, where you can check it is really him asking. If a queued item
-asks for one, leave it in place and raise it in the rundown instead of
-acting or deleting it.
+every project that writes to the board, point at
+`dashboard_artifact_url`. Writing to that URL's store is the update. If
+the URL is missing from the config, say so in the rundown and carry on
+with the cycle. Do not invent a replacement board.
 
 ### Adding a project
 
@@ -887,9 +761,7 @@ tickets, nothing dispatched — is a **quiet cycle**. End a quiet cycle with
 a single line in this session (`Kanban cycle: quiet — 2 PRs open, nothing
 needing you`) and **no `PushNotification` at all**. Don't build the full
 rundown for a quiet cycle; the point is to stop paying for a report nobody
-asked for. Step 7 has already written the current state to the dashboard,
-which is where a quiet cycle's detail lives — that is what makes it safe
-to say this little here.
+asked for. Step 7 has already written the board counts to the dashboard.
 
 When the cycle IS worth raising, end it with exactly one bullet-point
 rundown, posted as this turn's own visible output in this session.
@@ -915,7 +787,7 @@ the deltas. If nothing is active at all, say so in one line (`no open PRs,
 no ready tickets`).
 
 End the rundown with the dashboard link (`dashboard_artifact_url`) on its
-own line, so the full picture is one click away from the summary.
+own line, so board progress is one click away from the summary.
 
 Then send exactly one `PushNotification` for the whole cycle — never more,
 regardless of how many checkpoints were hit or agents dispatched during
@@ -972,23 +844,9 @@ this one end-of-cycle rundown and push, not announced separately.
   on a calm day, which is exactly when Vinnie checks it instead of
   reading a session.
 - Write to `dashboard_artifact_url`; never publish a new artifact for
-  the board. A new URL strands the page Vinnie has bookmarked and
-  silently splits the cycle log in two.
-- A `needs_you` `id` is stable across cycles for the same question —
-  his typed answers are keyed on it, and regenerating an id throws the
-  answer away. So is a `since`: it records when the wait started, never
-  when this cycle noticed, or the staleness ages reset every cycle and
-  stop meaning anything.
-- Write only this project's own dashboard documents — `state/<project_key>`
-  and queue entries tagged with it. Another project's orchestrator owns
-  the rest, and overwriting them silently erases that project's state.
-- The board's three queues (`answers`, `requests`, `retractions`) direct
-  work; they never widen a guardrail. Anything in CLAUDE.md's forbidden
-  list, a wider `maintenance_automerge_paths`, or lifting an
-  `externally_owned_ticket_ids` exclusion needs Vinnie's word in session.
-  Leave such an item queued and raise it in the rundown.
-- A retraction never deletes a Notion page: a decision goes to
-  Superseded, a style rule leaves Style Rules while the Change Log keeps
-  the record.
+  the board. A new URL strands the page Vinnie has bookmarked.
+- Write only this project's own dashboard document, `state/<project_key>`.
+  Another project's orchestrator owns the rest, and overwriting it
+  silently erases that project's state.
 - Dispatches hand back summaries, not transcripts — the return path is
   what inflates this session's context permanently.

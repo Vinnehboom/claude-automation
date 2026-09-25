@@ -9,21 +9,20 @@ artifact, not this file.
 
 ## What the page does
 
-The page holds no state. It reads five collections from the artifact's
-document store and shows them:
+The page holds no state. It reads one collection from the artifact's
+document store, `state`, and shows one section per document. Each
+project writes `state/<project_key>` under its own key. The section
+shows three things:
 
-- `state/<project_key>` — the current picture for one project. Every
-  project writes to this same board under its own key.
-- `cycles/<id>` — one short document per cycle, tagged with its project.
-  The page shows the most recent 40, newest first.
-- `answers/<id>` — a reply to a question, keyed by that question's id.
-- `requests/<id>` — a prompt for one project's orchestrator.
-- `retractions/<id>` — a request to retire a decision or a style rule.
+- Card counts by status, as one bar.
+- Progress per epic.
+- Pull requests merged per week, split into ticket work and automation
+  upkeep.
 
-The page writes the last three. A cycle reads them at step 0, acts, and
-deletes them.
+The page also shows how old each snapshot is. A snapshot older than
+eight days gets a "A cycle was missed" chip, because cycles run weekly.
 
-Step 7 of `../SKILL.md` gives the field-by-field shape of each document.
+Step 7 of `../SKILL.md` gives the field-by-field shape of the document.
 That step is the contract. If you change a field name here, change it
 there in the same commit.
 
