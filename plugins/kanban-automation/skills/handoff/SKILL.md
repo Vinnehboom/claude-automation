@@ -217,15 +217,9 @@ you.
    step 7, not after it — step 7's automation work can be ambiguous or
    slow to resolve, and the predecessor must not sit unretired while it
    does.
-7. Write one entry to the dashboard's cycle log, so the board shows
-   the generation change instead of a silent gap. The board is the
-   Artifact at dashboard_artifact_url in .claude/kanban-cycle.json;
-   step 7 of the kanban-cycle skill gives the document shape. Write to
-   that URL — do not publish a new artifact. Then do the "pending
-   automation work" listed in the handoff note.
+7. Do the "pending automation work" listed in the handoff note.
 8. Report back in one short message: generation number, triggers
-   re-pointed, PRs re-subscribed, dashboard entry written, automation
-   work done. Raise anything that failed. Do not restate the board's state — the next scheduled
+   re-pointed, PRs re-subscribed, automation work done. Raise anything that failed. Do not restate the board's state — the next scheduled
    cycle covers that.
 
 Standing role from here: you run the kanban cycle when a Routine fires,
