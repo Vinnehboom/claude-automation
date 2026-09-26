@@ -107,3 +107,8 @@ jobs:
             bash -n plugins/$plugin/scripts/ui_capture/run.sh
             plugins/$plugin/scripts/ui_capture/test/run_tests.sh
           done
+
+      - name: PR evidence publisher (shell syntax + synthetic suite)
+        run: |
+          bash -n plugins/kanban-projects/scripts/pr_evidence/publish.sh
+          plugins/kanban-projects/scripts/pr_evidence/test/run_tests.sh

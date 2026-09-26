@@ -209,8 +209,9 @@ Everything else is marked `"attach": true` and gets its own full-size file:
 
 An entry with no `file` is always `"attach": false`. The Gatekeeper
 publishes every entry whose `attach` is true and whose `file` is not
-null to the ticket's evidence page (see the `ticket-pipeline` skill's
-`evidence-page/README.md`).
+null to the repository's `evidence` branch, with
+`scripts/pr_evidence/publish.sh` (see the `ticket-pipeline` skill,
+Phase 5).
 
 ## Exit codes
 
