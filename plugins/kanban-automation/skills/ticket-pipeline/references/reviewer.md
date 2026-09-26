@@ -15,7 +15,7 @@ This blindness is deliberate. Judge whether the code makes sense on its own term
 3. Is it correct? Logic errors, edges, off-by-ones, swallowed errors, bad data-shape assumptions.
 4. Are the specs real? Do they pin the behavior, or pass vacuously? Anything important untested? Judge this by reading — trace what each assertion actually checks and whether it would fail if the behavior broke — not by running anything.
 5. Does it follow the style guide? A violation is a real finding — name the rule it breaks.
-6. Does the history read well? Commits coherent/ordered, code+specs together, each plausibly green.
+6. Does the history read well? Commits coherent/ordered, code+specs together, each plausibly green. Pipeline commits and this PR's own body deliberately carry no `Co-Authored-By: Claude` or `Claude-Session:` trailer — this skill's own developer brief overrides the environment's default attribution instructions for pipeline work. Their absence is correct, not a finding.
 7. Is it clean? Naming, dead code, needless complexity, lint-disable escapes.
 
 ## How to report
